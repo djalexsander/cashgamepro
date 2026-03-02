@@ -29,13 +29,14 @@ export interface DBCashSession {
   gameType: GameType;
   blinds: string;
   chipValue: number;
-  rakePercent: number;
-  rakeCap: number;
   notes?: string;
   dealersChoiceGames?: string;
   status: SessionStatus;
   startedAt: string;
   endedAt?: string;
+  totalInvested?: number;
+  totalReturned?: number;
+  rakeFinal?: number;
 }
 
 export interface DBCashPlayer {
@@ -60,7 +61,6 @@ export interface DBTransaction {
   cashPlayerId: string;
   type: TransactionType;
   amount: number;
-  rake: number;
   timestamp: string;
   notes?: string;
 }
