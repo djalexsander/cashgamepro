@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,15 @@ const PlayerModal = ({ open, onOpenChange, onPlayerCreated, editPlayer }: Player
   const [pix, setPix] = useState(editPlayer?.pix ?? "");
   const [notes, setNotes] = useState(editPlayer?.notes ?? "");
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setName(editPlayer?.name ?? "");
+    setNickname(editPlayer?.nickname ?? "");
+    setPhone(editPlayer?.phone ?? "");
+    setPix(editPlayer?.pix ?? "");
+    setNotes(editPlayer?.notes ?? "");
+  }, [open, editPlayer]);
 
   const handleSave = async () => {
     if (!name.trim()) {
