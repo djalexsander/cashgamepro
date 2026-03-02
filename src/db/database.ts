@@ -82,15 +82,33 @@ const emptyDB: DBSchema = {
 const readDB = (): DBSchema => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return emptyDB;
-    return { ...emptyDB, ...JSON.parse(raw) } as DBSchema;
-  } catch {
-    return emptyDB;
+    if (!raw) return JSON.parse(JSON.stringify(emptyDB));
+    const parsed = JSON.parse(raw);
+    return {
+      players: Array.isArray(parsed.players) ? parsed.players : [],
+      cashSessions: Array.isArray(parsed.cashSessions) ? parsed.cashSessions : [],
+      cashPlayers: Array.isArray(parsed.cashPlayers) ? parsed.cashPlayers : [],
+      transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
+    };
+  } catch (e) {
+    console.error("Erro ao ler banco de dados:", e);
+    return JSON.parse(JSON.stringify(emptyDB));
   }
 };
 
-const writeDB = (db: DBSchema) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+const writeDB = (data: DBSchema) => {
+  try {
+    const json = JSON.stringify(data);
+    localStorage.setItem(STORAGE_KEY, json);
+    // Verify write
+    const verify = localStorage.getItem(STORAGE_KEY);
+    if (!verify) {
+      console.error("Falha ao persistir dados no localStorage");
+    }
+  } catch (e) {
+    console.error("Erro ao salvar banco de dados:", e);
+    throw e;
+  }
 };
 
 class LocalTable<T extends { id: string }> {
@@ -107,10 +125,15 @@ class LocalTable<T extends { id: string }> {
     writeDB(db);
   }
 
+  async toArray(): Promise<T[]> {
+    return this.read();
+  }
+
   async add(item: T): Promise<string> {
     const data = this.read();
     data.push(item);
     this.save(data);
+    console.log(`[DB] add to ${this.name}:`, item.id);
     return item.id;
   }
 
@@ -121,9 +144,13 @@ class LocalTable<T extends { id: string }> {
   async update(id: string, changes: Partial<T>): Promise<number> {
     const data = this.read();
     const index = data.findIndex((item) => item.id === id);
-    if (index === -1) return 0;
+    if (index === -1) {
+      console.warn(`[DB] update: item ${id} not found in ${this.name}`);
+      return 0;
+    }
     data[index] = { ...data[index], ...changes };
     this.save(data);
+    console.log(`[DB] updated ${this.name}:`, id, Object.keys(changes));
     return 1;
   }
 

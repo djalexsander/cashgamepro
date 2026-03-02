@@ -218,19 +218,31 @@ const ActiveCashGame = () => {
       return;
     }
     try {
-      await db.cashSessions.update(id!, {
-        status: "closed",
+      console.log("[EndSession] Saving session:", id, { totalInvested, totalReturned, rakeFinal });
+      const updated = await db.cashSessions.update(id!, {
+        status: "closed" as const,
         endedAt: new Date().toISOString(),
         totalInvested,
         totalReturned,
         rakeFinal,
       });
+      console.log("[EndSession] Update result:", updated);
+      
+      if (updated === 0) {
+        toast({ title: "Erro", description: "Sessão não encontrada para atualizar.", variant: "destructive" });
+        return;
+      }
+      
+      // Verify the save worked
+      const saved = await db.cashSessions.get(id!);
+      console.log("[EndSession] Verified saved session:", saved?.status, saved?.rakeFinal);
+      
       toast({ title: "Cash Game encerrado! 🏁", description: `Rake da casa: R$ ${rakeFinal.toFixed(2)}` });
       setEndSessionOpen(false);
       navigate("/history");
     } catch (error) {
-      console.error("Erro:", error);
-      toast({ title: "Erro", description: "Falha ao encerrar.", variant: "destructive" });
+      console.error("Erro ao encerrar:", error);
+      toast({ title: "Erro", description: "Falha ao encerrar. Verifique o console.", variant: "destructive" });
     }
   };
 
