@@ -42,9 +42,19 @@ const HistoryPage = () => {
   const [detailOpen, setDetailOpen] = useState(false);
 
   useEffect(() => {
-    db.cashSessions.orderBy("startedAt").reverse().toArray().then(all => {
-      setSessions(all.filter(s => s.status === "closed"));
-    });
+    const loadHistory = async () => {
+      try {
+        const all = await db.cashSessions.toArray();
+        console.log("[History] All sessions:", all.length, all.map(s => ({ id: s.id, name: s.name, status: s.status })));
+        const closed = all.filter(s => s.status === "closed");
+        closed.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+        console.log("[History] Closed sessions:", closed.length);
+        setSessions(closed);
+      } catch (e) {
+        console.error("[History] Erro ao carregar histórico:", e);
+      }
+    };
+    loadHistory();
   }, []);
 
   const openDetail = async (session: DBCashSession) => {
