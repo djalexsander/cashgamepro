@@ -227,7 +227,7 @@ const ActiveCashGame = () => {
       });
       toast({ title: "Cash Game encerrado! 🏁", description: `Rake da casa: R$ ${rakeFinal.toFixed(2)}` });
       setEndSessionOpen(false);
-      navigate("/cash-games");
+      navigate("/history");
     } catch (error) {
       console.error("Erro:", error);
       toast({ title: "Erro", description: "Falha ao encerrar.", variant: "destructive" });
@@ -336,32 +336,39 @@ const ActiveCashGame = () => {
 
       {/* End Session Summary Dialog */}
       <Dialog open={endSessionOpen} onOpenChange={setEndSessionOpen}>
-        <DialogContent className="bg-card border-border max-w-md">
-          <DialogHeader>
+        <DialogContent className="bg-card border-border max-w-lg max-h-[90vh] p-0">
+          <DialogHeader className="p-4 pb-0">
             <DialogTitle className="text-poker-gold flex items-center gap-2">
               <DollarSign className="w-5 h-5" />
-              Resumo do Cash Game
+              Relatório de Movimento
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+          <div className="overflow-y-auto max-h-[70vh] p-4 pt-2 space-y-4">
+            {/* Session info */}
+            <div className="text-xs text-muted-foreground">
+              <p>{session.name} • {session.blinds} • {session.gameType.replace("_", " ")}</p>
+              <p>Início: {new Date(session.startedAt).toLocaleString("pt-BR")}</p>
+            </div>
+
+            {/* Summary */}
+            <div className="grid grid-cols-2 gap-2">
               <div className="bg-muted rounded-lg p-3 text-center">
-                <p className="text-xs text-muted-foreground">Total Jogadores</p>
+                <p className="text-xs text-muted-foreground">Jogadores</p>
                 <p className="text-xl font-bold font-display">{cashPlayers.length}</p>
-              </div>
-              <div className="bg-muted rounded-lg p-3 text-center">
-                <p className="text-xs text-muted-foreground">Total Investido</p>
-                <p className="text-xl font-bold font-display text-secondary">R$ {totalInvested.toFixed(2)}</p>
-              </div>
-              <div className="bg-muted rounded-lg p-3 text-center">
-                <p className="text-xs text-muted-foreground">Total Devolvido</p>
-                <p className="text-xl font-bold font-display">R$ {totalReturned.toFixed(2)}</p>
               </div>
               <div className="bg-muted rounded-lg p-3 text-center">
                 <p className="text-xs text-muted-foreground">Rake da Casa</p>
                 <p className={`text-xl font-bold font-display ${rakeFinal >= 0 ? "text-primary" : "text-destructive"}`}>
                   R$ {rakeFinal.toFixed(2)}
                 </p>
+              </div>
+              <div className="bg-muted rounded-lg p-3 text-center">
+                <p className="text-xs text-muted-foreground">Total Investido</p>
+                <p className="text-lg font-bold font-display text-secondary">R$ {totalInvested.toFixed(2)}</p>
+              </div>
+              <div className="bg-muted rounded-lg p-3 text-center">
+                <p className="text-xs text-muted-foreground">Total Devolvido</p>
+                <p className="text-lg font-bold font-display">R$ {totalReturned.toFixed(2)}</p>
               </div>
             </div>
 
@@ -372,25 +379,56 @@ const ActiveCashGame = () => {
               </div>
             )}
 
-            {/* Player results summary */}
-            <div className="space-y-1 max-h-40 overflow-y-auto">
-              <p className="text-xs text-muted-foreground font-semibold">Resultados:</p>
-              {cashPlayers.map(cp => (
-                <div key={cp.id} className="flex justify-between text-sm">
-                  <span>{cp.player?.name ?? "Jogador"}</span>
-                  <span className={`font-bold ${(cp.result ?? 0) >= 0 ? "text-primary" : "text-destructive"}`}>
-                    R$ {(cp.result ?? 0) >= 0 ? "+" : ""}{(cp.result ?? 0).toFixed(2)}
-                  </span>
-                </div>
-              ))}
+            {/* Full player report with transaction history */}
+            <div className="space-y-3">
+              <p className="text-sm font-semibold text-poker-gold">Detalhes por Jogador</p>
+              {cashPlayers.map(cp => {
+                const playerTxs = transactions.filter(t => t.cashPlayerId === cp.id).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+                const txLabels: Record<string, string> = { buyin: "Buy-in", rebuy: "Rebuy", addon: "Add Fichas", withdrawal: "Retirada", cashout: "Cash Out" };
+                return (
+                  <Card key={cp.id} className="bg-muted/50 border-border">
+                    <CardContent className="p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-semibold text-sm">{cp.player?.name ?? "Jogador"}</p>
+                          {cp.player?.nickname && <p className="text-[10px] text-muted-foreground">"{cp.player.nickname}"</p>}
+                        </div>
+                        <div className="text-right">
+                          <p className={`text-sm font-bold ${(cp.result ?? 0) >= 0 ? "text-primary" : "text-destructive"}`}>
+                            {(cp.result ?? 0) >= 0 ? "+" : ""}R$ {(cp.result ?? 0).toFixed(2)}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">Investido: R$ {cp.totalInvested.toFixed(2)}</p>
+                        </div>
+                      </div>
+                      <div className="text-[10px] text-muted-foreground flex gap-3">
+                        <span>Entrada: {new Date(cp.joinedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
+                        {cp.closedAt && <span>Saída: {new Date(cp.closedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>}
+                      </div>
+                      {playerTxs.length > 0 && (
+                        <div className="bg-background/50 rounded p-2 space-y-1">
+                          {playerTxs.map(tx => (
+                            <div key={tx.id} className="flex items-center gap-2 text-xs">
+                              <span className="text-[10px] text-muted-foreground w-12 shrink-0">
+                                {new Date(tx.timestamp).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                              </span>
+                              <span className="flex-1">{txLabels[tx.type] ?? tx.type}</span>
+                              <span className="font-bold">R$ {tx.amount.toFixed(2)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </div>
-          <DialogFooter>
+          <div className="p-4 pt-0 flex gap-2 justify-end">
             <Button variant="outline" onClick={() => setEndSessionOpen(false)}>Cancelar</Button>
             <Button onClick={confirmEndSession} variant="destructive" disabled={totalReturned > totalInvested}>
               Confirmar Encerramento
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
