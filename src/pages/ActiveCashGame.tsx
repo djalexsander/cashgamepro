@@ -11,7 +11,7 @@ import { toast } from "@/hooks/use-toast";
 import PlayerModal from "@/components/PlayerModal";
 import {
   ArrowLeft, Plus, Users, DollarSign, Clock, Spade,
-  PlusCircle, MinusCircle, RotateCcw, FileText, Lock, UserPlus
+  PlusCircle, MinusCircle, RotateCcw, Lock, UserPlus, AlertTriangle
 } from "lucide-react";
 
 const ActiveCashGame = () => {
@@ -39,6 +39,9 @@ const ActiveCashGame = () => {
   const [closePlayerOpen, setClosePlayerOpen] = useState(false);
   const [closeTargetId, setCloseTargetId] = useState("");
   const [finalChips, setFinalChips] = useState("");
+
+  // End session summary dialog
+  const [endSessionOpen, setEndSessionOpen] = useState(false);
 
   const load = async () => {
     if (!id) return;
@@ -79,7 +82,6 @@ const ActiveCashGame = () => {
     try {
       const cpId = generateId();
       const now = new Date().toISOString();
-      const rake = session ? Math.min(amount * (session.rakePercent / 100), session.rakeCap || Infinity) : 0;
 
       await db.cashPlayers.add({
         id: cpId,
@@ -87,7 +89,7 @@ const ActiveCashGame = () => {
         playerId: selectedPlayerId,
         initialBuyin: amount,
         totalInvested: amount,
-        currentChips: amount - rake,
+        currentChips: amount,
         paymentMethod,
         paymentStatus: paymentMethod === "pending" ? "pending" : "paid",
         joinedAt: now,
@@ -100,7 +102,6 @@ const ActiveCashGame = () => {
         cashPlayerId: cpId,
         type: "buyin",
         amount,
-        rake,
         timestamp: now,
       });
 
@@ -126,14 +127,12 @@ const ActiveCashGame = () => {
 
     try {
       const now = new Date().toISOString();
-      let rake = 0;
       let newChips = cp.currentChips;
       let newInvested = cp.totalInvested;
       let txType: DBTransaction["type"] = "addon";
 
       if (chipsAction === "add" || chipsAction === "rebuy") {
-        rake = Math.min(amount * (session.rakePercent / 100), session.rakeCap || Infinity);
-        newChips += amount - rake;
+        newChips += amount;
         newInvested += amount;
         txType = chipsAction === "rebuy" ? "rebuy" : "addon";
       } else {
@@ -144,7 +143,7 @@ const ActiveCashGame = () => {
       await db.cashPlayers.update(chipsTargetId, { currentChips: newChips, totalInvested: newInvested });
       await db.transactions.add({
         id: generateId(), sessionId: id!, cashPlayerId: chipsTargetId,
-        type: txType, amount, rake, timestamp: now,
+        type: txType, amount, timestamp: now,
       });
 
       toast({ title: "Movimentação registrada!", description: `${chipsAction === "remove" ? "Retirada" : chipsAction === "rebuy" ? "Rebuy" : "Add"}: R$ ${amount.toFixed(2)}` });
@@ -172,7 +171,6 @@ const ActiveCashGame = () => {
         finalChips: chips, result, isActive: false, closedAt: new Date().toISOString(), currentChips: chips,
       });
 
-      // Update player stats
       if (result >= 0) {
         await db.players.where("id").equals(cp.playerId).modify(p => { p.totalWinnings += result; p.totalSessions += 1; });
       } else {
@@ -181,7 +179,7 @@ const ActiveCashGame = () => {
 
       await db.transactions.add({
         id: generateId(), sessionId: id!, cashPlayerId: closeTargetId,
-        type: "cashout", amount: chips, rake: 0, timestamp: new Date().toISOString(),
+        type: "cashout", amount: chips, timestamp: new Date().toISOString(),
       });
 
       toast({ title: "Jogador fechado!", description: `Resultado: R$ ${result >= 0 ? "+" : ""}${result.toFixed(2)}` });
@@ -194,16 +192,41 @@ const ActiveCashGame = () => {
     }
   };
 
+  // Calculated values for end-session summary
+  const totalInvested = cashPlayers.reduce((sum, cp) => sum + cp.totalInvested, 0);
+  const totalReturned = cashPlayers.filter(cp => !cp.isActive).reduce((sum, cp) => sum + (cp.finalChips ?? 0), 0);
+  const rakeFinal = totalInvested - totalReturned;
+  const activePlayers = cashPlayers.filter(cp => cp.isActive);
+  const allClosed = activePlayers.length === 0 && cashPlayers.length > 0;
+
   const handleEndSession = async () => {
-    const activePlayers = cashPlayers.filter(cp => cp.isActive);
     if (activePlayers.length > 0) {
       toast({ title: "Atenção", description: `Feche todos os jogadores antes de encerrar. (${activePlayers.length} ativos)`, variant: "destructive" });
       return;
     }
-    if (!confirm("Encerrar este Cash Game?")) return;
+    if (cashPlayers.length === 0) {
+      toast({ title: "Atenção", description: "Nenhum jogador participou desta sessão.", variant: "destructive" });
+      return;
+    }
+    // Show summary dialog
+    setEndSessionOpen(true);
+  };
+
+  const confirmEndSession = async () => {
+    if (totalReturned > totalInvested) {
+      toast({ title: "Erro de conferência", description: "Valor devolvido maior que o investido. Verifique as fichas finais.", variant: "destructive" });
+      return;
+    }
     try {
-      await db.cashSessions.update(id!, { status: "closed", endedAt: new Date().toISOString() });
-      toast({ title: "Cash Game encerrado! 🏁" });
+      await db.cashSessions.update(id!, {
+        status: "closed",
+        endedAt: new Date().toISOString(),
+        totalInvested,
+        totalReturned,
+        rakeFinal,
+      });
+      toast({ title: "Cash Game encerrado! 🏁", description: `Rake da casa: R$ ${rakeFinal.toFixed(2)}` });
+      setEndSessionOpen(false);
       navigate("/cash-games");
     } catch (error) {
       console.error("Erro:", error);
@@ -213,9 +236,7 @@ const ActiveCashGame = () => {
 
   if (!session) return <div className="p-8 text-center text-muted-foreground">Carregando...</div>;
 
-  const activePlayers = cashPlayers.filter(cp => cp.isActive);
   const totalChips = cashPlayers.reduce((sum, cp) => sum + cp.currentChips, 0);
-  const totalRake = transactions.reduce((sum, tx) => sum + tx.rake, 0);
   const totalBuyins = cashPlayers.reduce((sum, cp) => sum + cp.totalInvested, 0);
   const availablePlayersToAdd = allPlayers.filter(p => !cashPlayers.find(cp => cp.playerId === p.id && cp.isActive));
   const elapsed = Math.floor((Date.now() - new Date(session.startedAt).getTime()) / 60000);
@@ -240,12 +261,11 @@ const ActiveCashGame = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         {[
           { icon: Users, label: "Ativos", value: activePlayers.length, color: "text-primary" },
           { icon: Spade, label: "Fichas", value: `R$${totalChips.toFixed(0)}`, color: "text-foreground" },
           { icon: DollarSign, label: "Buy-ins", value: `R$${totalBuyins.toFixed(0)}`, color: "text-secondary" },
-          { icon: DollarSign, label: "Rake", value: `R$${totalRake.toFixed(0)}`, color: "text-primary" },
         ].map((stat, i) => (
           <Card key={i} className="bg-card border-border">
             <CardContent className="p-2 text-center">
@@ -313,6 +333,66 @@ const ActiveCashGame = () => {
           Encerrar Cash Game
         </Button>
       )}
+
+      {/* End Session Summary Dialog */}
+      <Dialog open={endSessionOpen} onOpenChange={setEndSessionOpen}>
+        <DialogContent className="bg-card border-border max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-poker-gold flex items-center gap-2">
+              <DollarSign className="w-5 h-5" />
+              Resumo do Cash Game
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-muted rounded-lg p-3 text-center">
+                <p className="text-xs text-muted-foreground">Total Jogadores</p>
+                <p className="text-xl font-bold font-display">{cashPlayers.length}</p>
+              </div>
+              <div className="bg-muted rounded-lg p-3 text-center">
+                <p className="text-xs text-muted-foreground">Total Investido</p>
+                <p className="text-xl font-bold font-display text-secondary">R$ {totalInvested.toFixed(2)}</p>
+              </div>
+              <div className="bg-muted rounded-lg p-3 text-center">
+                <p className="text-xs text-muted-foreground">Total Devolvido</p>
+                <p className="text-xl font-bold font-display">R$ {totalReturned.toFixed(2)}</p>
+              </div>
+              <div className="bg-muted rounded-lg p-3 text-center">
+                <p className="text-xs text-muted-foreground">Rake da Casa</p>
+                <p className={`text-xl font-bold font-display ${rakeFinal >= 0 ? "text-primary" : "text-destructive"}`}>
+                  R$ {rakeFinal.toFixed(2)}
+                </p>
+              </div>
+            </div>
+
+            {totalReturned > totalInvested && (
+              <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
+                <AlertTriangle className="w-5 h-5 text-destructive flex-shrink-0" />
+                <p className="text-sm text-destructive">Erro de conferência: valor devolvido maior que o investido.</p>
+              </div>
+            )}
+
+            {/* Player results summary */}
+            <div className="space-y-1 max-h-40 overflow-y-auto">
+              <p className="text-xs text-muted-foreground font-semibold">Resultados:</p>
+              {cashPlayers.map(cp => (
+                <div key={cp.id} className="flex justify-between text-sm">
+                  <span>{cp.player?.name ?? "Jogador"}</span>
+                  <span className={`font-bold ${(cp.result ?? 0) >= 0 ? "text-primary" : "text-destructive"}`}>
+                    R$ {(cp.result ?? 0) >= 0 ? "+" : ""}{(cp.result ?? 0).toFixed(2)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEndSessionOpen(false)}>Cancelar</Button>
+            <Button onClick={confirmEndSession} variant="destructive" disabled={totalReturned > totalInvested}>
+              Confirmar Encerramento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Player Dialog */}
       <Dialog open={addPlayerOpen} onOpenChange={setAddPlayerOpen}>

@@ -16,8 +16,6 @@ const NewCashGame = () => {
   const [gameType, setGameType] = useState<GameType | "">("");
   const [blinds, setBlinds] = useState("");
   const [chipValue, setChipValue] = useState("");
-  const [rakePercent, setRakePercent] = useState("");
-  const [rakeCap, setRakeCap] = useState("");
   const [notes, setNotes] = useState("");
   const [dealersChoiceGames, setDealersChoiceGames] = useState("");
   const [saving, setSaving] = useState(false);
@@ -40,10 +38,6 @@ const NewCashGame = () => {
       toast({ title: "Campo obrigatório", description: "Informe o valor da ficha.", variant: "destructive" });
       return;
     }
-    if (!rakePercent || parseFloat(rakePercent) < 0) {
-      toast({ title: "Campo obrigatório", description: "Informe o percentual de rake.", variant: "destructive" });
-      return;
-    }
 
     setSaving(true);
     try {
@@ -53,8 +47,6 @@ const NewCashGame = () => {
         gameType: gameType as GameType,
         blinds: blinds.trim(),
         chipValue: parseFloat(chipValue),
-        rakePercent: parseFloat(rakePercent),
-        rakeCap: rakeCap ? parseFloat(rakeCap) : 0,
         notes: notes.trim() || undefined,
         dealersChoiceGames: gameType === "dealers_choice" ? dealersChoiceGames.trim() || undefined : undefined,
         status: "active" as const,
@@ -131,17 +123,6 @@ const NewCashGame = () => {
             <div className="space-y-2">
               <Label>Valor da Ficha (R$) *</Label>
               <Input type="number" value={chipValue} onChange={(e) => setChipValue(e.target.value)} placeholder="1.00" className="bg-muted border-border" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Rake (%) *</Label>
-              <Input type="number" value={rakePercent} onChange={(e) => setRakePercent(e.target.value)} placeholder="5" className="bg-muted border-border" />
-            </div>
-            <div className="space-y-2">
-              <Label>Cap de Rake (R$)</Label>
-              <Input type="number" value={rakeCap} onChange={(e) => setRakeCap(e.target.value)} placeholder="20" className="bg-muted border-border" />
             </div>
           </div>
 
