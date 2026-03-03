@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { LayoutDashboard, Spade, Users, History, Wallet, LogOut, Shield } from "lucide-react";
+import { LayoutDashboard, Spade, Users, History, Wallet, LogOut, Shield, UserCog } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth, useAdmin } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -37,10 +37,24 @@ const Layout = () => {
         </div>
         <div className="flex items-center gap-2">
           {isAdmin && (
-            <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-sans normal-case tracking-normal">
-              <Shield className="w-3 h-3" />
-              Admin
-            </div>
+            <>
+              <NavLink
+                to="/manage-users"
+                className={({ isActive }) =>
+                  cn(
+                    "flex items-center gap-1 px-2 py-1 rounded-md text-xs font-sans normal-case tracking-normal transition-colors",
+                    isActive ? "bg-primary/20 text-primary" : "bg-muted/50 text-muted-foreground hover:text-foreground"
+                  )
+                }
+              >
+                <UserCog className="w-3 h-3" />
+                Usuários
+              </NavLink>
+              <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-sans normal-case tracking-normal">
+                <Shield className="w-3 h-3" />
+                Admin
+              </div>
+            </>
           )}
           <Button variant="ghost" size="icon" onClick={handleLogout} title="Sair">
             <LogOut className="w-5 h-5 text-muted-foreground" />

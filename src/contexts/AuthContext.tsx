@@ -7,6 +7,7 @@ interface AuthContextType {
   user: User | null;
   isAdmin: boolean;
   isLoading: boolean;
+  isInactive: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -19,21 +20,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInactive, setIsInactive] = useState(false);
 
-  const checkAdmin = async (userId: string) => {
+  const checkAdminAndActive = async (userId: string) => {
     try {
-      const { data, error } = await supabase
+      // Check role
+      const { data: roleData, error: roleErr } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", userId)
         .eq("role", "admin")
         .maybeSingle();
-      if (error) {
-        console.error("Error checking admin role:", error);
-        setIsAdmin(false);
+      if (roleErr) console.error("Error checking admin role:", roleErr);
+      setIsAdmin(!!roleData);
+
+      // Check active status
+      const { data: profile, error: profileErr } = await supabase
+        .from("profiles")
+        .select("active")
+        .eq("id", userId)
+        .maybeSingle();
+      if (profileErr) console.error("Error checking profile:", profileErr);
+      
+      if (profile && profile.active === false) {
+        setIsInactive(true);
+        await supabase.auth.signOut();
         return;
       }
-      setIsAdmin(!!data);
+      setIsInactive(false);
     } catch {
       setIsAdmin(false);
     }
@@ -46,10 +60,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
-          // Use setTimeout to avoid deadlock with Supabase auth
-          setTimeout(() => checkAdmin(session.user.id), 0);
+          setTimeout(() => checkAdminAndActive(session.user.id), 0);
         } else {
           setIsAdmin(false);
+          setIsInactive(false);
         }
         setIsLoading(false);
       }
@@ -60,7 +74,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        checkAdmin(session.user.id);
+        checkAdminAndActive(session.user.id);
       }
       setIsLoading(false);
     });
@@ -88,7 +102,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ session, user, isAdmin, isLoading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ session, user, isAdmin, isLoading, isInactive, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );

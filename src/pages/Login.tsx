@@ -8,7 +8,7 @@ import { Spade, Loader2, Eye, EyeOff } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 const Login = () => {
-  const { signIn, signUp, session, isLoading } = useAuth();
+  const { signIn, signUp, session, isLoading, isInactive } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -41,7 +41,10 @@ const Login = () => {
       } else if (isSignUp) {
         toast({ title: "Conta criada!", description: "Verifique seu email para confirmar." });
       } else {
-        navigate("/", { replace: true });
+        // Small delay to allow inactive check to complete
+        setTimeout(() => {
+          navigate("/", { replace: true });
+        }, 500);
       }
     } catch {
       toast({ title: "Erro inesperado", variant: "destructive" });

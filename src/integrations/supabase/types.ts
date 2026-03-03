@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      profiles: {
+        Row: {
+          active: boolean
+          created_at: string
+          full_name: string | null
+          id: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          full_name?: string | null
+          id: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          full_name?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
