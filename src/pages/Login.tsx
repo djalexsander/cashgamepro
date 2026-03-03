@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,12 +8,18 @@ import { Spade, Loader2, Eye, EyeOff } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 const Login = () => {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, session, isLoading } = useAuth();
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
+
+  // If already logged in, redirect to dashboard
+  if (!isLoading && session) {
+    return <Navigate to="/" replace />;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,6 +40,8 @@ const Login = () => {
         });
       } else if (isSignUp) {
         toast({ title: "Conta criada!", description: "Verifique seu email para confirmar." });
+      } else {
+        navigate("/", { replace: true });
       }
     } catch {
       toast({ title: "Erro inesperado", variant: "destructive" });
