@@ -21,12 +21,12 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Plus, Shield, ShieldOff, UserX, UserCheck, Users } from "lucide-react";
+import { Loader2, Plus, Shield, ShieldOff, UserX, UserCheck, Users, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 
 const ManageUsers = () => {
   const { isAdmin, isLoading: authLoading } = useAuth();
-  const { users, loading, fetchUsers, createUser, updateRole, toggleActive } = useUsers();
+  const { users, loading, fetchUsers, createUser, updateRole, toggleActive, deleteUser } = useUsers();
 
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
@@ -82,6 +82,15 @@ const ManageUsers = () => {
       toast({ title: user.active ? "Usuário desativado" : "Usuário reativado" });
     } catch (err: any) {
       toast({ title: "Erro", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleDelete = async (user: AppUser) => {
+    try {
+      await deleteUser(user.id);
+      toast({ title: "Usuário excluído com sucesso" });
+    } catch (err: any) {
+      toast({ title: "Erro ao excluir", description: err.message, variant: "destructive" });
     }
   };
 
@@ -213,6 +222,34 @@ const ManageUsers = () => {
                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
                             <AlertDialogAction onClick={() => handleToggleActive(u)}>
                               Confirmar
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+
+                      {/* Delete user */}
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" title="Excluir usuário">
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle className="font-sans normal-case tracking-normal">
+                              Excluir Usuário
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Tem certeza que deseja excluir permanentemente <strong>{u.email}</strong>? Esta ação não pode ser desfeita.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              onClick={() => handleDelete(u)}
+                            >
+                              Excluir
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
