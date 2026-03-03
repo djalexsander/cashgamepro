@@ -192,6 +192,37 @@ const ActiveCashGame = () => {
     }
   };
 
+  const handleReopenPlayer = async (cashPlayerId: string) => {
+    const cp = cashPlayers.find(c => c.id === cashPlayerId);
+    if (!cp) return;
+    try {
+      // Revert player stats
+      const result = cp.result ?? 0;
+      if (result >= 0) {
+        await db.players.where("id").equals(cp.playerId).modify(p => { p.totalWinnings -= result; p.totalSessions -= 1; });
+      } else {
+        await db.players.where("id").equals(cp.playerId).modify(p => { p.totalLosses -= Math.abs(result); p.totalSessions -= 1; });
+      }
+
+      // Remove cashout transaction
+      const txs = await db.transactions.where("sessionId").equals(id!).toArray();
+      const cashoutTx = txs.filter(t => t.cashPlayerId === cashPlayerId && t.type === "cashout").sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+      if (cashoutTx) await db.transactions.delete(cashoutTx.id);
+
+      // Reopen the player
+      await db.cashPlayers.update(cashPlayerId, {
+        isActive: true, finalChips: undefined, result: undefined, closedAt: undefined,
+        currentChips: cp.totalInvested,
+      });
+
+      toast({ title: "Jogador reaberto! 🔄", description: `${cp.player?.name ?? "Jogador"} voltou à mesa.` });
+      load();
+    } catch (error) {
+      console.error("Erro ao reabrir jogador:", error);
+      toast({ title: "Erro", description: "Falha ao reabrir jogador.", variant: "destructive" });
+    }
+  };
+
   // Calculated values for end-session summary
   const totalInvested = cashPlayers.reduce((sum, cp) => sum + cp.totalInvested, 0);
   const totalReturned = cashPlayers.filter(cp => !cp.isActive).reduce((sum, cp) => sum + (cp.finalChips ?? 0), 0);
@@ -324,6 +355,23 @@ const ActiveCashGame = () => {
                   <Button size="sm" variant="destructive" className="text-xs h-8" onClick={() => { setCloseTargetId(cp.id); setClosePlayerOpen(true); }}>
                     <Lock className="w-3 h-3 mr-1" /> Fechar
                   </Button>
+                </div>
+              ) : session.status === "active" ? (
+                <div className="flex items-center justify-between text-xs">
+                  <div>
+                    <span className={`font-bold ${(cp.result ?? 0) >= 0 ? "text-primary" : "text-destructive"}`}>
+                      Resultado: R$ {(cp.result ?? 0) >= 0 ? "+" : ""}{(cp.result ?? 0).toFixed(2)}
+                    </span>
+                    <span className="ml-2 text-muted-foreground">({cp.paymentStatus})</span>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button size="sm" variant="outline" className="text-xs h-7 px-2" onClick={() => { setCloseTargetId(cp.id); setFinalChips(String(cp.finalChips ?? 0)); setClosePlayerOpen(true); }}>
+                      ✏️ Editar
+                    </Button>
+                    <Button size="sm" variant="ghost" className="text-xs h-7 px-2" onClick={() => handleReopenPlayer(cp.id)}>
+                      <RotateCcw className="w-3 h-3 mr-1" /> Reabrir
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div className="text-center text-xs">
