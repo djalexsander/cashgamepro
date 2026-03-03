@@ -159,6 +159,18 @@ class LocalTable<T extends { id: string }> {
     this.save(data);
   }
 
+  async clear(): Promise<void> {
+    this.save([]);
+    console.log(`[DB] cleared ${this.name}`);
+  }
+
+  async bulkDelete(ids: string[]): Promise<void> {
+    const set = new Set(ids);
+    const data = this.read().filter((item) => !set.has(item.id));
+    this.save(data);
+    console.log(`[DB] bulkDelete ${this.name}: ${ids.length} items`);
+  }
+
   orderBy<K extends keyof T>(field: K) {
     const getSorted = async () => {
       const data = this.read();
