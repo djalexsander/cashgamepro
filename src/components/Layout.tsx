@@ -1,10 +1,11 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { LayoutDashboard, Spade, Users, History } from "lucide-react";
+import { LayoutDashboard, Spade, Users, History, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/cash-games", icon: Spade, label: "Cash Games" },
+  { to: "/close-accounts", icon: Wallet, label: "Fechar" },
   { to: "/players", icon: Users, label: "Jogadores" },
   { to: "/history", icon: History, label: "Histórico" },
 ];
