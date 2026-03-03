@@ -11,6 +11,7 @@ import HistoryPage from "./pages/HistoryPage";
 import NewCashGame from "./pages/NewCashGame";
 import ActiveCashGame from "./pages/ActiveCashGame";
 import CloseAccounts from "./pages/CloseAccounts";
+import ManageUsers from "./pages/ManageUsers";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -57,6 +58,7 @@ const AppContent = () => {
         <Route path="/close-accounts" element={<CloseAccounts />} />
         <Route path="/players" element={<Players />} />
         <Route path="/history" element={<HistoryPage />} />
+        <Route path="/manage-users" element={<ManageUsers />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
