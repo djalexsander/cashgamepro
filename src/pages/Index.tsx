@@ -2,11 +2,13 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { Plus, Users, Spade, DollarSign, Clock, Trophy, Play } from "lucide-react";
+import { Plus, Users, Spade, DollarSign, Clock, Trophy, Play, Trash2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { db, type DBCashSession, type DBCashPlayer, type DBTransaction } from "@/db/database";
 
 const Index = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [sessions, setSessions] = useState<DBCashSession[]>([]);
   const [playerCount, setPlayerCount] = useState(0);
   const [activeSessions, setActiveSessions] = useState<DBCashSession[]>([]);
@@ -169,10 +171,26 @@ const Index = () => {
       {/* Recent Activity */}
       <Card className="bg-card border-border">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Trophy className="w-4 h-4 text-secondary" />
-            Atividade Recente
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Trophy className="w-4 h-4 text-secondary" />
+              Atividade Recente
+            </CardTitle>
+            {recentActivity.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs text-destructive hover:text-destructive"
+                onClick={async () => {
+                  await db.transactions.clear();
+                  setRecentActivity([]);
+                  toast({ title: "Histórico limpo! 🗑️", description: "Atividade recente foi removida." });
+                }}
+              >
+                <Trash2 className="w-3 h-3 mr-1" /> Limpar
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {recentActivity.length === 0 ? (

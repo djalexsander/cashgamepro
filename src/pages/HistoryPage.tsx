@@ -6,9 +6,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import {
   History, DollarSign, Users, Clock, ChevronRight,
-  TrendingUp, TrendingDown, ArrowUpCircle, ArrowDownCircle, RotateCcw, LogIn, LogOut
+  TrendingUp, TrendingDown, ArrowUpCircle, ArrowDownCircle, RotateCcw, LogIn, LogOut, Trash2
 } from "lucide-react";
 import { db, type DBCashSession, type DBCashPlayer, type DBPlayer, type DBTransaction } from "@/db/database";
+import { useToast } from "@/hooks/use-toast";
 
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
 const formatTime = (iso: string) => new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -37,6 +38,7 @@ interface SessionDetail {
 }
 
 const HistoryPage = () => {
+  const { toast } = useToast();
   const [sessions, setSessions] = useState<DBCashSession[]>([]);
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -77,7 +79,32 @@ const HistoryPage = () => {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl text-poker-gold">Histórico</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl text-poker-gold">Histórico</h2>
+        {sessions.length > 0 && (
+          <Button
+            variant="destructive"
+            size="sm"
+            className="text-xs"
+            onClick={async () => {
+              // Get IDs of closed sessions
+              const closedIds = sessions.map(s => s.id);
+              // Delete related cashPlayers and transactions
+              for (const sid of closedIds) {
+                const cps = await db.cashPlayers.where("sessionId").equals(sid).toArray();
+                await db.cashPlayers.bulkDelete(cps.map(c => c.id));
+                const txs = await db.transactions.where("sessionId").equals(sid).toArray();
+                await db.transactions.bulkDelete(txs.map(t => t.id));
+              }
+              await db.cashSessions.bulkDelete(closedIds);
+              setSessions([]);
+              toast({ title: "Histórico limpo! 🗑️", description: "Todas as sessões finalizadas foram removidas." });
+            }}
+          >
+            <Trash2 className="w-3 h-3 mr-1" /> Limpar Tudo
+          </Button>
+        )}
+      </div>
 
       {sessions.length === 0 ? (
         <Card className="bg-card border-border">
