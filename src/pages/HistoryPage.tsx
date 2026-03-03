@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -42,6 +43,7 @@ const HistoryPage = () => {
   const [sessions, setSessions] = useState<DBCashSession[]>([]);
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   useEffect(() => {
     const loadHistory = async () => {
@@ -146,7 +148,7 @@ const HistoryPage = () => {
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                      onClick={(e) => deleteSession(s.id, e)}
+                      onClick={(e) => { e.stopPropagation(); setDeleteTarget(s.id); }}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
@@ -254,6 +256,27 @@ const HistoryPage = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir sessão?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. Todos os dados desta sessão serão removidos permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { if (deleteTarget) deleteSession(deleteTarget); setDeleteTarget(null); }}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
