@@ -11,14 +11,17 @@ import HistoryPage from "./pages/HistoryPage";
 import NewCashGame from "./pages/NewCashGame";
 import ActiveCashGame from "./pages/ActiveCashGame";
 import CloseAccounts from "./pages/CloseAccounts";
+import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import ErrorBoundary from "./components/ErrorBoundary";
+import ProtectedRoute from "./components/ProtectedRoute";
+import { AuthProvider } from "./contexts/AuthContext";
 import { useEffect } from "react";
 import { toast } from "@/hooks/use-toast";
 
 const queryClient = new QueryClient();
 
-const App = () => {
+const AppContent = () => {
   useEffect(() => {
     const handler = (event: PromiseRejectionEvent) => {
       console.error("Unhandled rejection:", event.reason);
@@ -38,24 +41,39 @@ const App = () => {
   }, []);
 
   return (
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route
+        element={
+          <ProtectedRoute>
+            <Layout />
+          </ProtectedRoute>
+        }
+      >
+        <Route path="/" element={<Index />} />
+        <Route path="/cash-games" element={<CashGames />} />
+        <Route path="/cash-games/new" element={<NewCashGame />} />
+        <Route path="/cash-games/:id" element={<ActiveCashGame />} />
+        <Route path="/close-accounts" element={<CloseAccounts />} />
+        <Route path="/players" element={<Players />} />
+        <Route path="/history" element={<HistoryPage />} />
+      </Route>
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+};
+
+const App = () => {
+  return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            <Routes>
-              <Route element={<Layout />}>
-                <Route path="/" element={<Index />} />
-                <Route path="/cash-games" element={<CashGames />} />
-                <Route path="/cash-games/new" element={<NewCashGame />} />
-                <Route path="/cash-games/:id" element={<ActiveCashGame />} />
-                <Route path="/close-accounts" element={<CloseAccounts />} />
-                <Route path="/players" element={<Players />} />
-                <Route path="/history" element={<HistoryPage />} />
-              </Route>
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <AuthProvider>
+              <AppContent />
+            </AuthProvider>
           </BrowserRouter>
         </TooltipProvider>
       </QueryClientProvider>
