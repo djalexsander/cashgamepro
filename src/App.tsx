@@ -11,6 +11,7 @@ import HistoryPage from "./pages/HistoryPage";
 import NewCashGame from "./pages/NewCashGame";
 import ActiveCashGame from "./pages/ActiveCashGame";
 import NotFound from "./pages/NotFound";
+import ErrorBoundary from "./components/ErrorBoundary";
 import { useEffect } from "react";
 import { toast } from "@/hooks/use-toast";
 
@@ -23,30 +24,40 @@ const App = () => {
       toast({ title: "Erro inesperado", description: "Algo deu errado. Tente novamente.", variant: "destructive" });
       event.preventDefault();
     };
+    const errorHandler = (event: ErrorEvent) => {
+      console.error("Unhandled error:", event.error);
+      toast({ title: "Erro inesperado", description: "Algo deu errado. Verifique o console.", variant: "destructive" });
+    };
     window.addEventListener("unhandledrejection", handler);
-    return () => window.removeEventListener("unhandledrejection", handler);
+    window.addEventListener("error", errorHandler);
+    return () => {
+      window.removeEventListener("unhandledrejection", handler);
+      window.removeEventListener("error", errorHandler);
+    };
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route element={<Layout />}>
-              <Route path="/" element={<Index />} />
-              <Route path="/cash-games" element={<CashGames />} />
-              <Route path="/cash-games/new" element={<NewCashGame />} />
-              <Route path="/cash-games/:id" element={<ActiveCashGame />} />
-              <Route path="/players" element={<Players />} />
-              <Route path="/history" element={<HistoryPage />} />
-            </Route>
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route element={<Layout />}>
+                <Route path="/" element={<Index />} />
+                <Route path="/cash-games" element={<CashGames />} />
+                <Route path="/cash-games/new" element={<NewCashGame />} />
+                <Route path="/cash-games/:id" element={<ActiveCashGame />} />
+                <Route path="/players" element={<Players />} />
+                <Route path="/history" element={<HistoryPage />} />
+              </Route>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 };
 

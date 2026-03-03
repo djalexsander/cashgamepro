@@ -10,7 +10,12 @@ const CashGames = () => {
   const [sessions, setSessions] = useState<DBCashSession[]>([]);
 
   useEffect(() => {
-    db.cashSessions.orderBy("startedAt").reverse().toArray().then(setSessions).catch(console.error);
+    db.cashSessions.orderBy("startedAt").reverse().toArray()
+      .then(data => setSessions(data ?? []))
+      .catch(err => {
+        console.error("Erro ao carregar sessões:", err);
+        setSessions([]);
+      });
   }, []);
 
   const activeSessions = sessions.filter(s => s.status === "active");
