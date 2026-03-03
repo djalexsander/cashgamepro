@@ -50,5 +50,10 @@ export const useUsers = () => {
     await fetchUsers();
   };
 
-  return { users, loading, fetchUsers, createUser, updateRole, toggleActive };
+  const deleteUser = async (user_id: string) => {
+    await invoke({ action: "delete", user_id });
+    await fetchUsers();
+  };
+
+  return { users, loading, fetchUsers, createUser, updateRole, toggleActive, deleteUser };
 };
