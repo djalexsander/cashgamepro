@@ -5,10 +5,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Spade } from "lucide-react";
+import { ArrowLeft, Spade, CalendarIcon } from "lucide-react";
 import { db, generateId, type GameType } from "@/db/database";
 import { toast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 const NewCashGame = () => {
   const navigate = useNavigate();
@@ -18,6 +23,7 @@ const NewCashGame = () => {
   const [chipValue, setChipValue] = useState("");
   const [notes, setNotes] = useState("");
   const [dealersChoiceGames, setDealersChoiceGames] = useState("");
+  const [gameDate, setGameDate] = useState<Date>(new Date());
   const [saving, setSaving] = useState(false);
 
   const handleStart = async () => {
@@ -50,7 +56,7 @@ const NewCashGame = () => {
         notes: notes.trim() || undefined,
         dealersChoiceGames: gameType === "dealers_choice" ? dealersChoiceGames.trim() || undefined : undefined,
         status: "active" as const,
-        startedAt: new Date().toISOString(),
+        startedAt: gameDate.toISOString(),
       };
 
       await db.cashSessions.add(session);
@@ -81,6 +87,33 @@ const NewCashGame = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>Data do Cash Game *</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal bg-muted border-border",
+                    !gameDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {gameDate ? format(gameDate, "PPP", { locale: ptBR }) : <span>Selecione a data...</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={gameDate}
+                  onSelect={(d) => d && setGameDate(d)}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
           <div className="space-y-2">
             <Label>Nome do Cash Game *</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Cash Quinta 5/5" className="bg-muted border-border" />
