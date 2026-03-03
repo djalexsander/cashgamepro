@@ -1,6 +1,9 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { LayoutDashboard, Spade, Users, History, Wallet } from "lucide-react";
+import { LayoutDashboard, Spade, Users, History, Wallet, LogOut, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth, useAdmin } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/hooks/use-toast";
 
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -11,6 +14,14 @@ const navItems = [
 ];
 
 const Layout = () => {
+  const { signOut, user } = useAuth();
+  const isAdmin = useAdmin();
+
+  const handleLogout = async () => {
+    await signOut();
+    toast({ title: "Logout realizado", description: "Até logo!" });
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
@@ -23,6 +34,17 @@ const Layout = () => {
             <h1 className="text-lg leading-tight text-poker-gold">Poker Manager</h1>
             <p className="text-xs text-muted-foreground font-sans normal-case tracking-normal">Cash Game Pro</p>
           </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-sans normal-case tracking-normal">
+              <Shield className="w-3 h-3" />
+              Admin
+            </div>
+          )}
+          <Button variant="ghost" size="icon" onClick={handleLogout} title="Sair">
+            <LogOut className="w-5 h-5 text-muted-foreground" />
+          </Button>
         </div>
       </header>
 
