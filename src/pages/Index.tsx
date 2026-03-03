@@ -182,9 +182,14 @@ const Index = () => {
                 size="sm"
                 className="h-7 px-2 text-xs text-destructive hover:text-destructive"
                 onClick={async () => {
-                  await db.transactions.clear();
-                  setRecentActivity([]);
-                  toast({ title: "Histórico limpo! 🗑️", description: "Atividade recente foi removida." });
+                  try {
+                    await db.transactions.clear();
+                    setRecentActivity([]);
+                    toast({ title: "Histórico limpo! 🗑️", description: "Atividade recente foi removida." });
+                  } catch (error) {
+                    console.error("Erro ao limpar atividade:", error);
+                    toast({ title: "Erro", description: "Falha ao limpar atividade.", variant: "destructive" });
+                  }
                 }}
               >
                 <Trash2 className="w-3 h-3 mr-1" /> Limpar

@@ -328,7 +328,13 @@ const ActiveCashGame = () => {
 
       {/* Players List */}
       <div className="space-y-2">
-        {cashPlayers.map((cp) => (
+        {cashPlayers.length === 0 ? (
+          <Card className="bg-card border-border">
+            <CardContent className="p-6 text-center text-muted-foreground text-sm">
+              Nenhum jogador na mesa. Adicione jogadores para começar.
+            </CardContent>
+          </Card>
+        ) : cashPlayers.map((cp) => (
           <Card key={cp.id} className={`border-border ${cp.isActive ? "bg-card" : "bg-muted/50 opacity-60"}`}>
             <CardContent className="p-3">
               <div className="flex items-center justify-between mb-2">
