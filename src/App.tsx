@@ -10,6 +10,7 @@ import Players from "./pages/Players";
 import HistoryPage from "./pages/HistoryPage";
 import NewCashGame from "./pages/NewCashGame";
 import ActiveCashGame from "./pages/ActiveCashGame";
+import CloseAccounts from "./pages/CloseAccounts";
 import NotFound from "./pages/NotFound";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { useEffect } from "react";
@@ -49,6 +50,7 @@ const App = () => {
                 <Route path="/cash-games" element={<CashGames />} />
                 <Route path="/cash-games/new" element={<NewCashGame />} />
                 <Route path="/cash-games/:id" element={<ActiveCashGame />} />
+                <Route path="/close-accounts" element={<CloseAccounts />} />
                 <Route path="/players" element={<Players />} />
                 <Route path="/history" element={<HistoryPage />} />
               </Route>
