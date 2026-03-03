@@ -77,6 +77,17 @@ const HistoryPage = () => {
     return `${Math.floor(mins / 60)}h${(mins % 60).toString().padStart(2, "0")}m`;
   };
 
+  const deleteSession = async (sid: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    const cps = await db.cashPlayers.where("sessionId").equals(sid).toArray();
+    await db.cashPlayers.bulkDelete(cps.map(c => c.id));
+    const txs = await db.transactions.where("sessionId").equals(sid).toArray();
+    await db.transactions.bulkDelete(txs.map(t => t.id));
+    await db.cashSessions.delete(sid);
+    setSessions(prev => prev.filter(s => s.id !== sid));
+    toast({ title: "Sessão excluída! 🗑️" });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -131,6 +142,14 @@ const HistoryPage = () => {
                       <p className="text-sm font-bold text-primary">R$ {(s.rakeFinal ?? 0).toFixed(2)}</p>
                       <p className="text-[10px] text-muted-foreground">{duration(s)}</p>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      onClick={(e) => deleteSession(s.id, e)}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
                     <ChevronRight className="w-4 h-4 text-muted-foreground" />
                   </div>
                 </div>
