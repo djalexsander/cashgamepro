@@ -2,7 +2,11 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { Plus, Users, Spade, DollarSign, Clock, Trophy, Play, Trash2 } from "lucide-react";
+import { Plus, Users, Spade, DollarSign, Clock, Trophy, Play, Trash2, X } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { db, type DBCashSession, type DBCashPlayer, type DBTransaction } from "@/db/database";
 
@@ -14,6 +18,8 @@ const Index = () => {
   const [activeSessions, setActiveSessions] = useState<DBCashSession[]>([]);
   const [recentActivity, setRecentActivity] = useState<(DBTransaction & { playerName?: string; sessionName?: string })[]>([]);
   const [totalRake, setTotalRake] = useState(0);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [clearAllOpen, setClearAllOpen] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -181,16 +187,7 @@ const Index = () => {
                 variant="ghost"
                 size="sm"
                 className="h-7 px-2 text-xs text-destructive hover:text-destructive"
-                onClick={async () => {
-                  try {
-                    await db.transactions.clear();
-                    setRecentActivity([]);
-                    toast({ title: "Histórico limpo! 🗑️", description: "Atividade recente foi removida." });
-                  } catch (error) {
-                    console.error("Erro ao limpar atividade:", error);
-                    toast({ title: "Erro", description: "Falha ao limpar atividade.", variant: "destructive" });
-                  }
-                }}
+                onClick={() => setClearAllOpen(true)}
               >
                 <Trash2 className="w-3 h-3 mr-1" /> Limpar
               </Button>
@@ -204,13 +201,13 @@ const Index = () => {
             <div className="space-y-2">
               {recentActivity.map(tx => (
                 <div key={tx.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium">{tx.playerName}</p>
                     <p className="text-xs text-muted-foreground">
                       {txLabel(tx.type)} • {tx.sessionName}
                     </p>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right mr-2">
                     <p className={`text-sm font-bold ${tx.type === "withdrawal" || tx.type === "cashout" ? "text-secondary" : "text-primary"}`}>
                       R$ {tx.amount.toFixed(2)}
                     </p>
@@ -218,12 +215,61 @@ const Index = () => {
                       {new Date(tx.timestamp).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
                     </p>
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
+                    onClick={() => setDeleteTarget(tx.id!.toString())}
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
                 </div>
               ))}
             </div>
           )}
         </CardContent>
       </Card>
+      {/* Confirm delete single activity */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir atividade?</AlertDialogTitle>
+            <AlertDialogDescription>Essa ação não pode ser desfeita.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={async () => {
+              try {
+                await db.transactions.delete(deleteTarget!);
+                setRecentActivity(prev => prev.filter(t => t.id!.toString() !== deleteTarget));
+                toast({ title: "Removido ✅" });
+              } catch (e) { console.error(e); toast({ title: "Erro", variant: "destructive" }); }
+              setDeleteTarget(null);
+            }}>Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirm clear all */}
+      <AlertDialog open={clearAllOpen} onOpenChange={setClearAllOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Limpar toda atividade?</AlertDialogTitle>
+            <AlertDialogDescription>Todas as transações do histórico recente serão removidas permanentemente.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={async () => {
+              try {
+                await db.transactions.clear();
+                setRecentActivity([]);
+                toast({ title: "Histórico limpo! 🗑️" });
+              } catch (e) { console.error(e); toast({ title: "Erro", variant: "destructive" }); }
+              setClearAllOpen(false);
+            }}>Limpar Tudo</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

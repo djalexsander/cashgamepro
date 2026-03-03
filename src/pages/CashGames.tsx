@@ -2,12 +2,19 @@ import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { Plus, Spade, Play, Clock } from "lucide-react";
+import { Plus, Spade, Play, Clock, Trash2 } from "lucide-react";
 import { db, type DBCashSession } from "@/db/database";
+import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const CashGames = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [sessions, setSessions] = useState<DBCashSession[]>([]);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   useEffect(() => {
     db.cashSessions.orderBy("startedAt").reverse().toArray()
@@ -56,13 +63,23 @@ const CashGames = () => {
         <div className="space-y-2">
           <h3 className="text-sm text-muted-foreground uppercase tracking-wider">Encerradas</h3>
           {closedSessions.map(s => (
-            <Card key={s.id} className="bg-card border-border cursor-pointer opacity-70" onClick={() => navigate(`/cash-games/${s.id}`)}>
+            <Card key={s.id} className="bg-card border-border opacity-70">
               <CardContent className="p-4 flex items-center justify-between">
-                <div>
+                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/cash-games/${s.id}`)}>
                   <p className="font-semibold">{s.name}</p>
                   <p className="text-xs text-muted-foreground">{s.blinds} • {new Date(s.startedAt).toLocaleDateString("pt-BR")}</p>
                 </div>
-                <Clock className="w-4 h-4 text-muted-foreground" />
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-muted-foreground" />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    onClick={(e) => { e.stopPropagation(); setDeleteTarget(s.id!); }}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ))}
@@ -78,6 +95,31 @@ const CashGames = () => {
           </CardContent>
         </Card>
       )}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir sessão encerrada?</AlertDialogTitle>
+            <AlertDialogDescription>Todos os dados de jogadores e transações desta sessão serão removidos permanentemente.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={async () => {
+              try {
+                const sid = deleteTarget!;
+                const cps = await db.cashPlayers.where("sessionId").equals(sid).toArray();
+                const cpIds = cps.map(c => c.id!);
+                const txs = await db.transactions.where("sessionId").equals(sid).toArray();
+                for (const tx of txs) await db.transactions.delete(tx.id);
+                if (cpIds.length) await db.cashPlayers.bulkDelete(cpIds);
+                await db.cashSessions.delete(sid);
+                setSessions(prev => prev.filter(s => s.id !== sid));
+                toast({ title: "Sessão excluída ✅" });
+              } catch (e) { console.error(e); toast({ title: "Erro ao excluir", variant: "destructive" }); }
+              setDeleteTarget(null);
+            }}>Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
