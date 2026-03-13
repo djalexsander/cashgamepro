@@ -71,15 +71,12 @@ async function getUserId(): Promise<string> {
   return data.user.id;
 }
 
-// Mapping helpers: camelCase <-> snake_case
-function playerToDb(p: DBPlayer, userId: string) {
-  return {
-    id: p.id, user_id: userId, name: p.name, nickname: p.nickname,
-    phone: p.phone || null, pix: p.pix || null, notes: p.notes || null,
-    tags: p.tags, total_winnings: p.totalWinnings, total_losses: p.totalLosses,
-    total_sessions: p.totalSessions, created_at: p.createdAt, updated_at: p.updatedAt,
-  };
+// Use the untyped postgrest client to avoid type issues with new tables
+function from(table: string) {
+  return (supabase as any).from(table);
 }
+
+// Mapping helpers
 function playerFromDb(row: any): DBPlayer {
   return {
     id: row.id, name: row.name, nickname: row.nickname || "",
@@ -89,7 +86,27 @@ function playerFromDb(row: any): DBPlayer {
     createdAt: row.created_at, updatedAt: row.updated_at,
   };
 }
+function playerToDb(p: DBPlayer, userId: string) {
+  return {
+    id: p.id, user_id: userId, name: p.name, nickname: p.nickname,
+    phone: p.phone || null, pix: p.pix || null, notes: p.notes || null,
+    tags: p.tags, total_winnings: p.totalWinnings, total_losses: p.totalLosses,
+    total_sessions: p.totalSessions, created_at: p.createdAt, updated_at: p.updatedAt,
+  };
+}
 
+function sessionFromDb(row: any): DBCashSession {
+  return {
+    id: row.id, name: row.name, gameType: row.game_type as GameType,
+    blinds: row.blinds, chipValue: Number(row.chip_value),
+    notes: row.notes || undefined, dealersChoiceGames: row.dealers_choice_games || undefined,
+    status: row.status as SessionStatus, startedAt: row.started_at,
+    endedAt: row.ended_at || undefined,
+    totalInvested: row.total_invested != null ? Number(row.total_invested) : undefined,
+    totalReturned: row.total_returned != null ? Number(row.total_returned) : undefined,
+    rakeFinal: row.rake_final != null ? Number(row.rake_final) : undefined,
+  };
+}
 function sessionToDb(s: DBCashSession, userId: string) {
   return {
     id: s.id, user_id: userId, name: s.name, game_type: s.gameType,
@@ -100,28 +117,7 @@ function sessionToDb(s: DBCashSession, userId: string) {
     rake_final: s.rakeFinal ?? null,
   };
 }
-function sessionFromDb(row: any): DBCashSession {
-  return {
-    id: row.id, name: row.name, gameType: row.game_type as GameType,
-    blinds: row.blinds, chipValue: Number(row.chip_value),
-    notes: row.notes || undefined, dealersChoiceGames: row.dealers_choice_games || undefined,
-    status: row.status as SessionStatus, startedAt: row.started_at,
-    endedAt: row.ended_at || undefined, totalInvested: row.total_invested != null ? Number(row.total_invested) : undefined,
-    totalReturned: row.total_returned != null ? Number(row.total_returned) : undefined,
-    rakeFinal: row.rake_final != null ? Number(row.rake_final) : undefined,
-  };
-}
 
-function cashPlayerToDb(cp: DBCashPlayer, userId: string) {
-  return {
-    id: cp.id, user_id: userId, session_id: cp.sessionId, player_id: cp.playerId,
-    initial_buyin: cp.initialBuyin, total_invested: cp.totalInvested,
-    current_chips: cp.currentChips, final_chips: cp.finalChips ?? null,
-    result: cp.result ?? null, payment_method: cp.paymentMethod,
-    payment_status: cp.paymentStatus, joined_at: cp.joinedAt,
-    closed_at: cp.closedAt || null, is_active: cp.isActive,
-  };
-}
 function cashPlayerFromDb(row: any): DBCashPlayer {
   return {
     id: row.id, sessionId: row.session_id, playerId: row.player_id,
@@ -135,14 +131,17 @@ function cashPlayerFromDb(row: any): DBCashPlayer {
     isActive: row.is_active,
   };
 }
-
-function txToDb(tx: DBTransaction, userId: string) {
+function cashPlayerToDb(cp: DBCashPlayer, userId: string) {
   return {
-    id: tx.id, user_id: userId, session_id: tx.sessionId,
-    cash_player_id: tx.cashPlayerId, type: tx.type,
-    amount: tx.amount, timestamp: tx.timestamp, notes: tx.notes || null,
+    id: cp.id, user_id: userId, session_id: cp.sessionId, player_id: cp.playerId,
+    initial_buyin: cp.initialBuyin, total_invested: cp.totalInvested,
+    current_chips: cp.currentChips, final_chips: cp.finalChips ?? null,
+    result: cp.result ?? null, payment_method: cp.paymentMethod,
+    payment_status: cp.paymentStatus, joined_at: cp.joinedAt,
+    closed_at: cp.closedAt || null, is_active: cp.isActive,
   };
 }
+
 function txFromDb(row: any): DBTransaction {
   return {
     id: row.id, sessionId: row.session_id, cashPlayerId: row.cash_player_id,
@@ -150,120 +149,98 @@ function txFromDb(row: any): DBTransaction {
     timestamp: row.timestamp, notes: row.notes || undefined,
   };
 }
+function txToDb(tx: DBTransaction, userId: string) {
+  return {
+    id: tx.id, user_id: userId, session_id: tx.sessionId,
+    cash_player_id: tx.cashPlayerId, type: tx.type,
+    amount: tx.amount, timestamp: tx.timestamp, notes: tx.notes || null,
+  };
+}
 
-// Field name mapping for dynamic where/orderBy
-const fieldMaps: Record<string, Record<string, string>> = {
-  players: { id: "id", name: "name", nickname: "nickname", createdAt: "created_at", updatedAt: "updated_at", totalWinnings: "total_winnings", totalLosses: "total_losses", totalSessions: "total_sessions" },
-  cash_sessions: { id: "id", name: "name", startedAt: "started_at", endedAt: "ended_at", status: "status", gameType: "game_type", blinds: "blinds" },
-  cash_players: { id: "id", sessionId: "session_id", playerId: "player_id", isActive: "is_active", joinedAt: "joined_at" },
-  transactions: { id: "id", sessionId: "session_id", cashPlayerId: "cash_player_id", type: "type", timestamp: "timestamp" },
+// camelCase to snake_case field mapping
+const camelToSnake: Record<string, string> = {
+  totalInvested: "total_invested", totalReturned: "total_returned", rakeFinal: "rake_final",
+  endedAt: "ended_at", currentChips: "current_chips", finalChips: "final_chips",
+  closedAt: "closed_at", isActive: "is_active", paymentMethod: "payment_method",
+  paymentStatus: "payment_status", initialBuyin: "initial_buyin", totalWinnings: "total_winnings",
+  totalLosses: "total_losses", totalSessions: "total_sessions", updatedAt: "updated_at",
+  gameType: "game_type", chipValue: "chip_value", dealersChoiceGames: "dealers_choice_games",
+  startedAt: "started_at", sessionId: "session_id", playerId: "player_id",
+  cashPlayerId: "cash_player_id", createdAt: "created_at",
+  id: "id", name: "name", nickname: "nickname", phone: "phone", pix: "pix",
+  notes: "notes", tags: "tags", blinds: "blinds", status: "status", type: "type",
+  amount: "amount", timestamp: "timestamp", result: "result",
 };
 
-type TableName = "players" | "cash_sessions" | "cash_players" | "transactions";
+function mapChangesToSnake(changes: Record<string, any>): Record<string, any> {
+  const result: Record<string, any> = {};
+  for (const [key, value] of Object.entries(changes)) {
+    const snakeKey = camelToSnake[key] || key;
+    result[snakeKey] = value === undefined ? null : value;
+  }
+  return result;
+}
 
 class SupabaseTable<T extends { id: string }> {
   constructor(
-    private table: TableName,
-    private fromDb: (row: any) => T,
-    private toDb: (item: T, userId: string) => any,
+    private table: string,
+    private fromDbFn: (row: any) => T,
+    private toDbFn: (item: T, userId: string) => any,
   ) {}
 
-  private mapField(field: string): string {
-    return fieldMaps[this.table]?.[field] || field;
-  }
-
   async toArray(): Promise<T[]> {
-    const { data, error } = await supabase.from(this.table).select("*");
+    const { data, error } = await from(this.table).select("*");
     if (error) throw error;
-    return (data || []).map(this.fromDb);
+    return (data || []).map(this.fromDbFn);
   }
 
   async add(item: T): Promise<string> {
     const userId = await getUserId();
-    const row = this.toDb(item, userId);
-    const { error } = await supabase.from(this.table).insert(row);
+    const row = this.toDbFn(item, userId);
+    const { error } = await from(this.table).insert(row);
     if (error) throw error;
     return item.id;
   }
 
   async get(id: string): Promise<T | undefined> {
-    const { data, error } = await supabase.from(this.table).select("*").eq("id", id).maybeSingle();
+    const { data, error } = await from(this.table).select("*").eq("id", id).maybeSingle();
     if (error) throw error;
-    return data ? this.fromDb(data) : undefined;
+    return data ? this.fromDbFn(data) : undefined;
   }
 
   async update(id: string, changes: Partial<T>): Promise<number> {
-    const userId = await getUserId();
-    // Convert camelCase changes to snake_case
-    const dbChanges: any = {};
-    for (const [key, value] of Object.entries(changes)) {
-      const dbKey = this.mapField(key);
-      dbChanges[dbKey] = value === undefined ? null : value;
-    }
-    // Also map specific known fields
-    if ('totalInvested' in changes) dbChanges.total_invested = changes.totalInvested as any;
-    if ('totalReturned' in changes) dbChanges.total_returned = changes.totalReturned as any;
-    if ('rakeFinal' in changes) dbChanges.rake_final = changes.rakeFinal as any;
-    if ('endedAt' in changes) dbChanges.ended_at = changes.endedAt as any;
-    if ('currentChips' in changes) dbChanges.current_chips = changes.currentChips as any;
-    if ('finalChips' in changes) dbChanges.final_chips = (changes as any).finalChips ?? null;
-    if ('closedAt' in changes) dbChanges.closed_at = (changes as any).closedAt || null;
-    if ('isActive' in changes) dbChanges.is_active = (changes as any).isActive;
-    if ('paymentMethod' in changes) dbChanges.payment_method = (changes as any).paymentMethod;
-    if ('paymentStatus' in changes) dbChanges.payment_status = (changes as any).paymentStatus;
-    if ('initialBuyin' in changes) dbChanges.initial_buyin = (changes as any).initialBuyin;
-    if ('totalWinnings' in changes) dbChanges.total_winnings = (changes as any).totalWinnings;
-    if ('totalLosses' in changes) dbChanges.total_losses = (changes as any).totalLosses;
-    if ('totalSessions' in changes) dbChanges.total_sessions = (changes as any).totalSessions;
-    if ('updatedAt' in changes) dbChanges.updated_at = (changes as any).updatedAt;
-    if ('gameType' in changes) dbChanges.game_type = (changes as any).gameType;
-    if ('chipValue' in changes) dbChanges.chip_value = (changes as any).chipValue;
-    if ('dealersChoiceGames' in changes) dbChanges.dealers_choice_games = (changes as any).dealersChoiceGames;
-    if ('startedAt' in changes) dbChanges.started_at = (changes as any).startedAt;
-    if ('sessionId' in changes) dbChanges.session_id = (changes as any).sessionId;
-    if ('playerId' in changes) dbChanges.player_id = (changes as any).playerId;
-    if ('cashPlayerId' in changes) dbChanges.cash_player_id = (changes as any).cashPlayerId;
-    // Remove duplicates from mapField
-    delete dbChanges.totalInvested; delete dbChanges.totalReturned; delete dbChanges.rakeFinal;
-    delete dbChanges.endedAt; delete dbChanges.currentChips; delete dbChanges.finalChips;
-    delete dbChanges.closedAt; delete dbChanges.isActive; delete dbChanges.paymentMethod;
-    delete dbChanges.paymentStatus; delete dbChanges.initialBuyin; delete dbChanges.totalWinnings;
-    delete dbChanges.totalLosses; delete dbChanges.totalSessions; delete dbChanges.updatedAt;
-    delete dbChanges.gameType; delete dbChanges.chipValue; delete dbChanges.dealersChoiceGames;
-    delete dbChanges.startedAt; delete dbChanges.sessionId; delete dbChanges.playerId;
-    delete dbChanges.cashPlayerId;
-
-    const { error, count } = await supabase.from(this.table).update(dbChanges).eq("id", id);
+    const dbChanges = mapChangesToSnake(changes as Record<string, any>);
+    const { error } = await from(this.table).update(dbChanges).eq("id", id);
     if (error) throw error;
     return 1;
   }
 
   async delete(id: string): Promise<void> {
-    const { error } = await supabase.from(this.table).delete().eq("id", id);
+    const { error } = await from(this.table).delete().eq("id", id);
     if (error) throw error;
   }
 
   async clear(): Promise<void> {
     const userId = await getUserId();
-    const { error } = await supabase.from(this.table).delete().eq("user_id", userId);
+    const { error } = await from(this.table).delete().eq("user_id", userId);
     if (error) throw error;
   }
 
   async bulkDelete(ids: string[]): Promise<void> {
     if (ids.length === 0) return;
-    const { error } = await supabase.from(this.table).delete().in("id", ids);
+    const { error } = await from(this.table).delete().in("id", ids);
     if (error) throw error;
   }
 
   orderBy(field: string) {
-    const dbField = this.mapField(field);
-    const fromDb = this.fromDb;
-    const table = this.table;
+    const dbField = camelToSnake[field] || field;
+    const fromDbFn = this.fromDbFn;
+    const tableName = this.table;
 
     const getSorted = async (ascending: boolean) => {
-      const { data, error } = await supabase.from(table).select("*").order(dbField, { ascending });
+      const { data, error } = await from(tableName).select("*").order(dbField, { ascending });
       if (error) throw error;
-      return (data || []).map(fromDb);
+      return (data || []).map(fromDbFn);
     };
 
     return {
@@ -275,37 +252,34 @@ class SupabaseTable<T extends { id: string }> {
   }
 
   where(field: string) {
-    const dbField = this.mapField(field);
-    const fromDb = this.fromDb;
-    const table = this.table;
+    const dbField = camelToSnake[field] || field;
+    const fromDbFn = this.fromDbFn;
+    const tableName = this.table;
+    const self = this;
 
     return {
       equals: (value: any) => ({
         toArray: async (): Promise<T[]> => {
-          const { data, error } = await supabase.from(table).select("*").eq(dbField, value);
+          const { data, error } = await from(tableName).select("*").eq(dbField, value);
           if (error) throw error;
-          return (data || []).map(fromDb);
+          return (data || []).map(fromDbFn);
         },
         modify: async (mutator: (item: T) => void): Promise<number> => {
-          // Read matching items, apply mutator, save back
-          const { data, error } = await supabase.from(table).select("*").eq(dbField, value);
+          const { data, error } = await from(tableName).select("*").eq(dbField, value);
           if (error) throw error;
-          const items = (data || []).map(fromDb);
+          const items = (data || []).map(fromDbFn);
           let changed = 0;
-          const userId = await getUserId();
           for (const item of items) {
-            const original = { ...item };
+            const original = JSON.parse(JSON.stringify(item));
             mutator(item);
-            // Find what changed
-            const changes: any = {};
+            const changes: Record<string, any> = {};
             for (const key of Object.keys(item) as (keyof T)[]) {
-              if (item[key] !== (original as any)[key]) {
-                changes[key] = item[key];
+              if (JSON.stringify(item[key]) !== JSON.stringify(original[key])) {
+                changes[key as string] = item[key];
               }
             }
             if (Object.keys(changes).length > 0) {
-              // Use the update method's logic
-              await db[tableKeyMap[table]].update(item.id, changes);
+              await self.update(item.id, changes as Partial<T>);
               changed++;
             }
           }
@@ -315,22 +289,14 @@ class SupabaseTable<T extends { id: string }> {
       anyOf: (values: any[]) => ({
         toArray: async (): Promise<T[]> => {
           if (values.length === 0) return [];
-          const { data, error } = await supabase.from(table).select("*").in(dbField, values);
+          const { data, error } = await from(tableName).select("*").in(dbField, values);
           if (error) throw error;
-          return (data || []).map(fromDb);
+          return (data || []).map(fromDbFn);
         },
       }),
     };
   }
 }
-
-// Map table names to db keys for modify() cross-reference
-const tableKeyMap: Record<TableName, keyof typeof db> = {
-  players: "players",
-  cash_sessions: "cashSessions",
-  cash_players: "cashPlayers",
-  transactions: "transactions",
-};
 
 export const db = {
   players: new SupabaseTable<DBPlayer>("players", playerFromDb, playerToDb),
