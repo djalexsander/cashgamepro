@@ -14,6 +14,171 @@ export type Database = {
   }
   public: {
     Tables: {
+      cash_players: {
+        Row: {
+          closed_at: string | null
+          current_chips: number
+          final_chips: number | null
+          id: string
+          initial_buyin: number
+          is_active: boolean
+          joined_at: string
+          payment_method: string
+          payment_status: string
+          player_id: string
+          result: number | null
+          session_id: string
+          total_invested: number
+          user_id: string
+        }
+        Insert: {
+          closed_at?: string | null
+          current_chips?: number
+          final_chips?: number | null
+          id?: string
+          initial_buyin?: number
+          is_active?: boolean
+          joined_at?: string
+          payment_method?: string
+          payment_status?: string
+          player_id: string
+          result?: number | null
+          session_id: string
+          total_invested?: number
+          user_id: string
+        }
+        Update: {
+          closed_at?: string | null
+          current_chips?: number
+          final_chips?: number | null
+          id?: string
+          initial_buyin?: number
+          is_active?: boolean
+          joined_at?: string
+          payment_method?: string
+          payment_status?: string
+          player_id?: string
+          result?: number | null
+          session_id?: string
+          total_invested?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_players_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_players_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "cash_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cash_sessions: {
+        Row: {
+          blinds: string
+          chip_value: number
+          dealers_choice_games: string | null
+          ended_at: string | null
+          game_type: string
+          id: string
+          name: string
+          notes: string | null
+          rake_final: number | null
+          started_at: string
+          status: string
+          total_invested: number | null
+          total_returned: number | null
+          user_id: string
+        }
+        Insert: {
+          blinds: string
+          chip_value?: number
+          dealers_choice_games?: string | null
+          ended_at?: string | null
+          game_type: string
+          id?: string
+          name: string
+          notes?: string | null
+          rake_final?: number | null
+          started_at?: string
+          status?: string
+          total_invested?: number | null
+          total_returned?: number | null
+          user_id: string
+        }
+        Update: {
+          blinds?: string
+          chip_value?: number
+          dealers_choice_games?: string | null
+          ended_at?: string | null
+          game_type?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          rake_final?: number | null
+          started_at?: string
+          status?: string
+          total_invested?: number | null
+          total_returned?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      players: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          nickname: string
+          notes: string | null
+          phone: string | null
+          pix: string | null
+          tags: string[] | null
+          total_losses: number
+          total_sessions: number
+          total_winnings: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          nickname?: string
+          notes?: string | null
+          phone?: string | null
+          pix?: string | null
+          tags?: string[] | null
+          total_losses?: number
+          total_sessions?: number
+          total_winnings?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          nickname?: string
+          notes?: string | null
+          phone?: string | null
+          pix?: string | null
+          tags?: string[] | null
+          total_losses?: number
+          total_sessions?: number
+          total_winnings?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           active: boolean
@@ -34,6 +199,54 @@ export type Database = {
           id?: string
         }
         Relationships: []
+      }
+      transactions: {
+        Row: {
+          amount: number
+          cash_player_id: string
+          id: string
+          notes: string | null
+          session_id: string
+          timestamp: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          cash_player_id: string
+          id?: string
+          notes?: string | null
+          session_id: string
+          timestamp?: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          cash_player_id?: string
+          id?: string
+          notes?: string | null
+          session_id?: string
+          timestamp?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_cash_player_id_fkey"
+            columns: ["cash_player_id"]
+            isOneToOne: false
+            referencedRelation: "cash_players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "cash_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
