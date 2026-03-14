@@ -70,6 +70,36 @@ const Login = () => {
 
       <Card className="relative z-10 w-full max-w-sm bg-card/90 backdrop-blur-sm border-border shadow-2xl">
         <CardContent className="p-8 space-y-8">
+          {/* Subscription blocked notification */}
+          {isSubscriptionBlocked && (
+            <div className="flex items-start gap-3 p-4 rounded-lg bg-destructive/10 border border-destructive/30">
+              <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-destructive font-sans normal-case tracking-normal">
+                  Acesso bloqueado por inadimplência
+                </p>
+                <p className="text-xs text-muted-foreground mt-1 font-sans normal-case tracking-normal">
+                  Sua mensalidade está vencida. Entre em contato com o administrador para regularizar seu acesso.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Inactive notification (non-subscription) */}
+          {isInactive && !isSubscriptionBlocked && (
+            <div className="flex items-start gap-3 p-4 rounded-lg bg-destructive/10 border border-destructive/30">
+              <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-destructive font-sans normal-case tracking-normal">
+                  Conta desativada
+                </p>
+                <p className="text-xs text-muted-foreground mt-1 font-sans normal-case tracking-normal">
+                  Sua conta foi desativada pelo administrador.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Logo */}
           <div className="flex flex-col items-center gap-3">
             <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center glow-green">
