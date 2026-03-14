@@ -131,7 +131,7 @@ const Login = () => {
               <Spade className="w-9 h-9 text-primary-foreground" />
             </div>
             <div className="text-center">
-              <h1 className="text-2xl text-poker-gold">Poker Manager</h1>
+              <h1 className="text-2xl text-poker-gold">Cash Game Pro</h1>
               <p className="text-xs text-muted-foreground font-sans normal-case tracking-normal mt-1">
                 Cash Game Pro
               </p>

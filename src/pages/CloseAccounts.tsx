@@ -193,7 +193,7 @@ const CloseAccounts = () => {
         .footer { text-align: center; margin-top: 20px; font-size: 0.8em; color: #666; border-top: 2px dashed #333; padding-top: 10px; }
         .positive { color: green; } .negative { color: red; }
       </style></head><body>
-        <h2>🃏 Poker Manager</h2>
+        <h2>🃏 Cash Game Pro</h2>
         <p style="text-align:center;font-size:0.85em;">${receiptData.session}</p>
         <div class="row"><span>Jogador:</span><span><b>${receiptData.name}</b></span></div>
         <div class="row"><span>Investido:</span><span>R$ ${receiptData.invested.toFixed(2)}</span></div>
@@ -203,7 +203,7 @@ const CloseAccounts = () => {
         </div>
         <div class="row"><span>Data:</span><span>${receiptData.date}</span></div>
         <div class="footer">
-          <p>Poker Manager - Cash Game Pro</p>
+          <p>Cash Game Pro</p>
           <p>Documento gerado automaticamente</p>
         </div>
         <script>setTimeout(() => window.print(), 300);</script>
@@ -512,7 +512,7 @@ const CloseAccounts = () => {
           {receiptData && (
             <div className="space-y-3 text-sm">
               <div className="bg-muted rounded-lg p-4 space-y-2 font-mono">
-                <p className="text-center font-bold text-base">🃏 Poker Manager</p>
+                <p className="text-center font-bold text-base">🃏 Cash Game Pro</p>
                 <p className="text-center text-xs text-muted-foreground">{receiptData.session}</p>
                 <div className="border-t border-dashed border-border my-2" />
                 <div className="flex justify-between"><span>Jogador:</span><span className="font-bold">{receiptData.name}</span></div>
