@@ -15,7 +15,7 @@ const navItems = [
 ];
 
 const Layout = () => {
-  const { signOut, user } = useAuth();
+  const { signOut, user, fullName } = useAuth();
   const isAdmin = useAdmin();
 
   const handleLogout = async () => {
