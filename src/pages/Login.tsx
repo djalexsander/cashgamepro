@@ -6,15 +6,18 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Spade, Loader2, Eye, EyeOff } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const Login = () => {
   const { signIn, signUp, session, isLoading, isInactive } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
+  const savedEmail = localStorage.getItem("poker_remember_email") || "";
+  const [email, setEmail] = useState(savedEmail);
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
+  const [rememberMe, setRememberMe] = useState(!!savedEmail);
 
   // If already logged in, redirect to dashboard
   if (!isLoading && session) {
@@ -41,7 +44,12 @@ const Login = () => {
       } else if (isSignUp) {
         toast({ title: "Conta criada!", description: "Verifique seu email para confirmar." });
       } else {
-        // Small delay to allow inactive check to complete
+        // Save or clear remembered email
+        if (rememberMe) {
+          localStorage.setItem("poker_remember_email", email);
+        } else {
+          localStorage.removeItem("poker_remember_email");
+        }
         setTimeout(() => {
           navigate("/", { replace: true });
         }, 500);
@@ -113,6 +121,19 @@ const Login = () => {
                 </button>
               </div>
             </div>
+
+            {!isSignUp && (
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="remember"
+                  checked={rememberMe}
+                  onCheckedChange={(checked) => setRememberMe(!!checked)}
+                />
+                <label htmlFor="remember" className="text-sm text-muted-foreground font-sans normal-case tracking-normal cursor-pointer">
+                  Lembrar meu email
+                </label>
+              </div>
+            )}
 
             <Button type="submit" className="w-full h-12 text-base font-display" disabled={loading}>
               {loading ? (
