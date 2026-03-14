@@ -33,7 +33,7 @@ const Layout = () => {
           </div>
           <div>
             <h1 className="text-lg leading-tight text-poker-gold">Poker Manager</h1>
-            <p className="text-xs text-muted-foreground font-sans normal-case tracking-normal">Cash Game Pro</p>
+            <p className="text-xs text-muted-foreground font-sans normal-case tracking-normal">Cash Game Pro v{version}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
