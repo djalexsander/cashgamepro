@@ -362,16 +362,60 @@ const ActiveCashGame = () => {
         ) : cashPlayers.map((cp) => (
           <Card key={cp.id} className={`border-border ${cp.isActive ? "bg-card" : "bg-muted/50 opacity-60"}`}>
             <CardContent className="p-3">
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between mb-1">
                 <div>
                   <p className="font-semibold text-sm">{cp.player?.name ?? "Jogador"}</p>
                   {cp.player?.nickname && <p className="text-xs text-muted-foreground">"{cp.player.nickname}"</p>}
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold">R$ {cp.currentChips.toFixed(2)}</p>
-                  <p className="text-[10px] text-muted-foreground">Investido: R$ {cp.totalInvested.toFixed(2)}</p>
+                <div className="flex items-center gap-2">
+                  {/* Transaction history toggle */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    title="Ver histórico de ações"
+                    onClick={() => setExpandedPlayerTx(expandedPlayerTx === cp.id ? null : cp.id)}
+                  >
+                    <ClipboardList className={`w-4 h-4 ${expandedPlayerTx === cp.id ? "text-primary" : "text-muted-foreground"}`} />
+                  </Button>
+                  <div className="text-right">
+                    <p className="text-sm font-bold">R$ {cp.currentChips.toFixed(2)}</p>
+                    <p className="text-[10px] text-muted-foreground">Investido: R$ {cp.totalInvested.toFixed(2)}</p>
+                  </div>
                 </div>
               </div>
+
+              {/* Entry time */}
+              <div className="flex items-center gap-1 text-[10px] text-muted-foreground mb-2">
+                <Clock className="w-3 h-3" />
+                <span>Entrada: {formatTime(cp.joinedAt)}</span>
+                {cp.closedAt && <span className="ml-2">• Saída: {formatTime(cp.closedAt)}</span>}
+              </div>
+
+              {/* Expanded transaction history */}
+              {expandedPlayerTx === cp.id && (
+                <div className="bg-muted/50 rounded-lg p-2 mb-2 space-y-1">
+                  <p className="text-[10px] font-semibold text-muted-foreground mb-1">Histórico de ações:</p>
+                  {(() => {
+                    const playerTxs = transactions
+                      .filter(t => t.cashPlayerId === cp.id)
+                      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+                    if (playerTxs.length === 0) return <p className="text-[10px] text-muted-foreground">Nenhuma movimentação.</p>;
+                    return playerTxs.map(tx => {
+                      const Icon = txIconMap[tx.type] ?? Clock;
+                      return (
+                        <div key={tx.id} className="flex items-center gap-2 text-xs">
+                          <span className="text-[10px] text-muted-foreground w-12 shrink-0 font-mono">{formatTime(tx.timestamp)}</span>
+                          <Icon className="w-3 h-3 shrink-0 text-muted-foreground" />
+                          <span className="flex-1">{txLabelMap[tx.type] ?? tx.type}</span>
+                          <span className="font-bold">R$ {tx.amount.toFixed(2)}</span>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              )}
+
               {cp.isActive ? (
                 <div className="grid grid-cols-4 gap-1">
                   <Button size="sm" variant="outline" className="text-xs h-8" onClick={() => { setChipsTargetId(cp.id); setChipsAction("add"); setChipsDialogOpen(true); }}>
