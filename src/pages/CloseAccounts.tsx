@@ -512,7 +512,7 @@ const CloseAccounts = () => {
           {receiptData && (
             <div className="space-y-3 text-sm">
               <div className="bg-muted rounded-lg p-4 space-y-2 font-mono">
-                <p className="text-center font-bold text-base">🃏 Poker Manager</p>
+                <p className="text-center font-bold text-base">🃏 Cash Game Pro</p>
                 <p className="text-center text-xs text-muted-foreground">{receiptData.session}</p>
                 <div className="border-t border-dashed border-border my-2" />
                 <div className="flex justify-between"><span>Jogador:</span><span className="font-bold">{receiptData.name}</span></div>

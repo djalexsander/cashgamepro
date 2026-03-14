@@ -32,7 +32,7 @@ const Layout = () => {
             <Spade className="w-6 h-6 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-lg leading-tight text-poker-gold">Poker Manager</h1>
+            <h1 className="text-lg leading-tight text-poker-gold">Cash Game Pro</h1>
             <p className="text-xs text-muted-foreground font-sans normal-case tracking-normal">Cash Game Pro v{version}</p>
           </div>
         </div>
