@@ -185,18 +185,24 @@ export type Database = {
           created_at: string
           full_name: string | null
           id: string
+          subscription_due_date: string | null
+          subscription_status: string
         }
         Insert: {
           active?: boolean
           created_at?: string
           full_name?: string | null
           id: string
+          subscription_due_date?: string | null
+          subscription_status?: string
         }
         Update: {
           active?: boolean
           created_at?: string
           full_name?: string | null
           id?: string
+          subscription_due_date?: string | null
+          subscription_status?: string
         }
         Relationships: []
       }
