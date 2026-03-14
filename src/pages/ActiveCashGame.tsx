@@ -11,7 +11,8 @@ import { toast } from "@/hooks/use-toast";
 import PlayerModal from "@/components/PlayerModal";
 import {
   ArrowLeft, Plus, Users, DollarSign, Clock, Spade,
-  PlusCircle, MinusCircle, RotateCcw, Lock, UserPlus, AlertTriangle
+  PlusCircle, MinusCircle, RotateCcw, Lock, UserPlus, AlertTriangle,
+  ClipboardList, LogIn, LogOut, ArrowUpCircle, ArrowDownCircle
 } from "lucide-react";
 
 const ActiveCashGame = () => {
