@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 interface AuthContextType {
   session: Session | null;
   user: User | null;
+  fullName: string | null;
   isAdmin: boolean;
   isLoading: boolean;
   isInactive: boolean;
