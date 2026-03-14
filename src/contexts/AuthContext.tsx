@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 interface AuthContextType {
   session: Session | null;
   user: User | null;
+  fullName: string | null;
   isAdmin: boolean;
   isLoading: boolean;
   isInactive: boolean;
@@ -25,6 +26,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isInactive, setIsInactive] = useState(false);
   const [isSubscriptionBlocked, setIsSubscriptionBlocked] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
+  const [fullName, setFullName] = useState<string | null>(null);
 
   const checkAdminAndActive = async (userId: string) => {
     try {
@@ -39,12 +41,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       const { data: profile, error: profileErr } = await supabase
         .from("profiles")
-        .select("active, subscription_status")
+        .select("active, subscription_status, full_name")
         .eq("id", userId)
         .maybeSingle();
       if (profileErr) console.error("Error checking profile:", profileErr);
 
       if (profile) {
+        setFullName(profile.full_name);
         setSubscriptionStatus(profile.subscription_status);
 
         if (profile.active === false) {
@@ -120,7 +123,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ session, user, isAdmin, isLoading, isInactive, isSubscriptionBlocked, subscriptionStatus, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ session, user, fullName, isAdmin, isLoading, isInactive, isSubscriptionBlocked, subscriptionStatus, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );

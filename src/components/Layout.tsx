@@ -15,7 +15,7 @@ const navItems = [
 ];
 
 const Layout = () => {
-  const { signOut, user } = useAuth();
+  const { signOut, user, fullName } = useAuth();
   const isAdmin = useAdmin();
 
   const handleLogout = async () => {
@@ -37,6 +37,10 @@ const Layout = () => {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* User name */}
+          <span className="text-xs text-muted-foreground font-sans normal-case tracking-normal hidden sm:block max-w-[140px] truncate">
+            {fullName || user?.email || ""}
+          </span>
           {isAdmin && (
             <>
               <NavLink
