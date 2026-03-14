@@ -44,6 +44,18 @@ const ActiveCashGame = () => {
   // End session summary dialog
   const [endSessionOpen, setEndSessionOpen] = useState(false);
 
+  // Player transaction history toggle
+  const [expandedPlayerTx, setExpandedPlayerTx] = useState<string | null>(null);
+
+  const formatTime = (iso: string) => new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+  const txLabelMap: Record<string, string> = {
+    buyin: "Buy-in", rebuy: "Rebuy", addon: "Add Fichas", withdrawal: "Retirada", cashout: "Cash Out",
+  };
+  const txIconMap: Record<string, typeof LogIn> = {
+    buyin: LogIn, rebuy: RotateCcw, addon: ArrowUpCircle, withdrawal: ArrowDownCircle, cashout: LogOut,
+  };
+
   const load = async () => {
     if (!id) return;
     try {
