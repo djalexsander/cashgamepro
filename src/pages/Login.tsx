@@ -44,7 +44,12 @@ const Login = () => {
       } else if (isSignUp) {
         toast({ title: "Conta criada!", description: "Verifique seu email para confirmar." });
       } else {
-        // Small delay to allow inactive check to complete
+        // Save or clear remembered email
+        if (rememberMe) {
+          localStorage.setItem("poker_remember_email", email);
+        } else {
+          localStorage.removeItem("poker_remember_email");
+        }
         setTimeout(() => {
           navigate("/", { replace: true });
         }, 500);
