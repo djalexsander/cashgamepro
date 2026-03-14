@@ -9,7 +9,7 @@ import { toast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 
 const Login = () => {
-  const { signIn, signUp, session, isLoading, isInactive } = useAuth();
+  const { signIn, signUp, session, isLoading, isInactive, isSubscriptionBlocked } = useAuth();
   const navigate = useNavigate();
   const savedEmail = localStorage.getItem("poker_remember_email") || "";
   const [email, setEmail] = useState(savedEmail);
