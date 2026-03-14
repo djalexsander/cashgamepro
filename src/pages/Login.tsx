@@ -135,7 +135,7 @@ const Login = () => {
               </div>
             )}
 
-
+            <Button type="submit" className="w-full h-12 text-base font-display" disabled={loading}>
               {loading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : isSignUp ? (
