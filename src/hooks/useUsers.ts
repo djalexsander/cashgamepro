@@ -9,6 +9,8 @@ export interface AppUser {
   role: "admin" | "user";
   created_at: string;
   active: boolean;
+  subscription_due_date: string | null;
+  subscription_status: "active" | "pending" | "blocked";
 }
 
 const invoke = async (body: Record<string, unknown>) => {
@@ -50,10 +52,15 @@ export const useUsers = () => {
     await fetchUsers();
   };
 
+  const updateSubscription = async (user_id: string, subscription_due_date: string | null, subscription_status: string) => {
+    await invoke({ action: "update_subscription", user_id, subscription_due_date, subscription_status });
+    await fetchUsers();
+  };
+
   const deleteUser = async (user_id: string) => {
     await invoke({ action: "delete", user_id });
     await fetchUsers();
   };
 
-  return { users, loading, fetchUsers, createUser, updateRole, toggleActive, deleteUser };
+  return { users, loading, fetchUsers, createUser, updateRole, toggleActive, updateSubscription, deleteUser };
 };

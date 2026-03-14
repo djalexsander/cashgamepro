@@ -8,6 +8,8 @@ interface AuthContextType {
   isAdmin: boolean;
   isLoading: boolean;
   isInactive: boolean;
+  isSubscriptionBlocked: boolean;
+  subscriptionStatus: string | null;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -21,10 +23,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isInactive, setIsInactive] = useState(false);
+  const [isSubscriptionBlocked, setIsSubscriptionBlocked] = useState(false);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
 
   const checkAdminAndActive = async (userId: string) => {
     try {
-      // Check role
       const { data: roleData, error: roleErr } = await supabase
         .from("user_roles")
         .select("role")
@@ -34,27 +37,43 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (roleErr) console.error("Error checking admin role:", roleErr);
       setIsAdmin(!!roleData);
 
-      // Check active status
       const { data: profile, error: profileErr } = await supabase
         .from("profiles")
-        .select("active")
+        .select("active, subscription_status")
         .eq("id", userId)
         .maybeSingle();
       if (profileErr) console.error("Error checking profile:", profileErr);
-      
-      if (profile && profile.active === false) {
-        setIsInactive(true);
-        await supabase.auth.signOut();
-        return;
+
+      if (profile) {
+        setSubscriptionStatus(profile.subscription_status);
+
+        if (profile.active === false) {
+          setIsInactive(true);
+          // Check if it's subscription blocked specifically
+          if (profile.subscription_status === "blocked") {
+            setIsSubscriptionBlocked(true);
+          }
+          await supabase.auth.signOut();
+          return;
+        }
+
+        // Even if active, warn about pending status
+        if (profile.subscription_status === "blocked") {
+          setIsSubscriptionBlocked(true);
+          setIsInactive(true);
+          await supabase.auth.signOut();
+          return;
+        }
       }
+
       setIsInactive(false);
+      setIsSubscriptionBlocked(false);
     } catch {
       setIsAdmin(false);
     }
   };
 
   useEffect(() => {
-    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         setSession(session);
@@ -69,7 +88,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     );
 
-    // THEN check existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
@@ -102,7 +120,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ session, user, isAdmin, isLoading, isInactive, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ session, user, isAdmin, isLoading, isInactive, isSubscriptionBlocked, subscriptionStatus, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );
