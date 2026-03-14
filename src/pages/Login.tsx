@@ -10,11 +10,13 @@ import { toast } from "@/hooks/use-toast";
 const Login = () => {
   const { signIn, signUp, session, isLoading, isInactive } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
+  const savedEmail = localStorage.getItem("poker_remember_email") || "";
+  const [email, setEmail] = useState(savedEmail);
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
+  const [rememberMe, setRememberMe] = useState(!!savedEmail);
 
   // If already logged in, redirect to dashboard
   if (!isLoading && session) {
