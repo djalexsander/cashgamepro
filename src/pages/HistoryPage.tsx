@@ -1,16 +1,22 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import {
-  History, DollarSign, Users, Clock, ChevronRight,
+  History, DollarSign, Users, Clock, ChevronRight, Filter, CalendarIcon, X,
   TrendingUp, TrendingDown, ArrowUpCircle, ArrowDownCircle, RotateCcw, LogIn, LogOut, Trash2
 } from "lucide-react";
 import { db, type DBCashSession, type DBCashPlayer, type DBPlayer, type DBTransaction } from "@/db/database";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
 const formatTime = (iso: string) => new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -41,25 +47,69 @@ interface SessionDetail {
 const HistoryPage = () => {
   const { toast } = useToast();
   const [sessions, setSessions] = useState<DBCashSession[]>([]);
+  const [filteredSessions, setFilteredSessions] = useState<DBCashSession[]>([]);
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+
+  // Filters
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterGameType, setFilterGameType] = useState<string>("all");
+  const [filterDateFrom, setFilterDateFrom] = useState<Date | undefined>(undefined);
+  const [filterDateTo, setFilterDateTo] = useState<Date | undefined>(undefined);
+  const [filterSearch, setFilterSearch] = useState("");
 
   useEffect(() => {
     const loadHistory = async () => {
       try {
         const all = await db.cashSessions.toArray();
-        console.log("[History] All sessions:", all.length, all.map(s => ({ id: s.id, name: s.name, status: s.status })));
         const closed = all.filter(s => s.status === "closed");
         closed.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
-        console.log("[History] Closed sessions:", closed.length);
         setSessions(closed);
+        setFilteredSessions(closed);
       } catch (e) {
         console.error("[History] Erro ao carregar histórico:", e);
       }
     };
     loadHistory();
   }, []);
+
+  // Apply filters
+  useEffect(() => {
+    let result = [...sessions];
+
+    if (filterGameType !== "all") {
+      result = result.filter(s => s.gameType === filterGameType);
+    }
+
+    if (filterDateFrom) {
+      const from = new Date(filterDateFrom);
+      from.setHours(0, 0, 0, 0);
+      result = result.filter(s => new Date(s.startedAt) >= from);
+    }
+
+    if (filterDateTo) {
+      const to = new Date(filterDateTo);
+      to.setHours(23, 59, 59, 999);
+      result = result.filter(s => new Date(s.startedAt) <= to);
+    }
+
+    if (filterSearch.trim()) {
+      const search = filterSearch.toLowerCase();
+      result = result.filter(s => s.name.toLowerCase().includes(search) || s.blinds.toLowerCase().includes(search));
+    }
+
+    setFilteredSessions(result);
+  }, [sessions, filterGameType, filterDateFrom, filterDateTo, filterSearch]);
+
+  const hasActiveFilters = filterGameType !== "all" || filterDateFrom || filterDateTo || filterSearch.trim();
+
+  const clearFilters = () => {
+    setFilterGameType("all");
+    setFilterDateFrom(undefined);
+    setFilterDateTo(undefined);
+    setFilterSearch("");
+  };
 
   const openDetail = async (session: DBCashSession) => {
     const cps = await db.cashPlayers.where("sessionId").equals(session.id).toArray();
@@ -90,46 +140,138 @@ const HistoryPage = () => {
     toast({ title: "Sessão excluída! 🗑️" });
   };
 
+  const uniqueGameTypes = [...new Set(sessions.map(s => s.gameType))];
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl text-poker-gold">Histórico</h2>
-        {sessions.length > 0 && (
+        <div className="flex items-center gap-2">
           <Button
-            variant="destructive"
+            variant={showFilters ? "default" : "outline"}
             size="sm"
             className="text-xs"
-            onClick={async () => {
-              // Get IDs of closed sessions
-              const closedIds = sessions.map(s => s.id);
-              // Delete related cashPlayers and transactions
-              for (const sid of closedIds) {
-                const cps = await db.cashPlayers.where("sessionId").equals(sid).toArray();
-                await db.cashPlayers.bulkDelete(cps.map(c => c.id));
-                const txs = await db.transactions.where("sessionId").equals(sid).toArray();
-                await db.transactions.bulkDelete(txs.map(t => t.id));
-              }
-              await db.cashSessions.bulkDelete(closedIds);
-              setSessions([]);
-              toast({ title: "Histórico limpo! 🗑️", description: "Todas as sessões finalizadas foram removidas." });
-            }}
+            onClick={() => setShowFilters(!showFilters)}
           >
-            <Trash2 className="w-3 h-3 mr-1" /> Limpar Tudo
+            <Filter className="w-3 h-3 mr-1" />
+            Filtros
+            {hasActiveFilters && (
+              <span className="ml-1 w-4 h-4 rounded-full bg-primary-foreground text-primary text-[10px] flex items-center justify-center">
+                !
+              </span>
+            )}
           </Button>
-        )}
+          {sessions.length > 0 && (
+            <Button
+              variant="destructive"
+              size="sm"
+              className="text-xs"
+              onClick={async () => {
+                const closedIds = sessions.map(s => s.id);
+                for (const sid of closedIds) {
+                  const cps = await db.cashPlayers.where("sessionId").equals(sid).toArray();
+                  await db.cashPlayers.bulkDelete(cps.map(c => c.id));
+                  const txs = await db.transactions.where("sessionId").equals(sid).toArray();
+                  await db.transactions.bulkDelete(txs.map(t => t.id));
+                }
+                await db.cashSessions.bulkDelete(closedIds);
+                setSessions([]);
+                toast({ title: "Histórico limpo! 🗑️" });
+              }}
+            >
+              <Trash2 className="w-3 h-3 mr-1" /> Limpar
+            </Button>
+          )}
+        </div>
       </div>
 
-      {sessions.length === 0 ? (
+      {/* Filters Panel */}
+      {showFilters && (
+        <Card className="bg-card border-border">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium font-sans normal-case tracking-normal">Filtrar sessões</p>
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" className="text-xs h-7" onClick={clearFilters}>
+                  <X className="w-3 h-3 mr-1" /> Limpar filtros
+                </Button>
+              )}
+            </div>
+
+            {/* Search */}
+            <Input
+              placeholder="Buscar por nome ou blinds..."
+              value={filterSearch}
+              onChange={(e) => setFilterSearch(e.target.value)}
+              className="h-9 text-sm"
+            />
+
+            <div className="grid grid-cols-2 gap-2">
+              {/* Game type */}
+              <Select value={filterGameType} onValueChange={setFilterGameType}>
+                <SelectTrigger className="h-9 text-xs">
+                  <SelectValue placeholder="Tipo de jogo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os jogos</SelectItem>
+                  {uniqueGameTypes.map(gt => (
+                    <SelectItem key={gt} value={gt}>{gt.replace("_", " ")}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Placeholder for alignment */}
+              <div />
+
+              {/* Date from */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="h-9 text-xs justify-start font-normal font-sans normal-case tracking-normal">
+                    <CalendarIcon className="w-3 h-3 mr-1" />
+                    {filterDateFrom ? format(filterDateFrom, "dd/MM/yy", { locale: ptBR }) : "Data início"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={filterDateFrom} onSelect={setFilterDateFrom} locale={ptBR} />
+                </PopoverContent>
+              </Popover>
+
+              {/* Date to */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="h-9 text-xs justify-start font-normal font-sans normal-case tracking-normal">
+                    <CalendarIcon className="w-3 h-3 mr-1" />
+                    {filterDateTo ? format(filterDateTo, "dd/MM/yy", { locale: ptBR }) : "Data fim"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar mode="single" selected={filterDateTo} onSelect={setFilterDateTo} locale={ptBR} />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <p className="text-xs text-muted-foreground font-sans normal-case tracking-normal">
+              {filteredSessions.length} de {sessions.length} sessões
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {filteredSessions.length === 0 ? (
         <Card className="bg-card border-border">
           <CardContent className="p-8 text-center">
             <History className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
-            <p className="text-muted-foreground">Nenhum histórico disponível.</p>
-            <p className="text-sm text-muted-foreground mt-1">Os cash games finalizados aparecerão aqui.</p>
+            <p className="text-muted-foreground">
+              {hasActiveFilters ? "Nenhuma sessão encontrada com os filtros aplicados." : "Nenhum histórico disponível."}
+            </p>
+            {!hasActiveFilters && (
+              <p className="text-sm text-muted-foreground mt-1">Os cash games finalizados aparecerão aqui.</p>
+            )}
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-2">
-          {sessions.map(s => (
+          {filteredSessions.map(s => (
             <Card key={s.id} className="bg-card border-border cursor-pointer hover:border-primary/40 transition-colors" onClick={() => openDetail(s)}>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
@@ -174,7 +316,6 @@ const HistoryPage = () => {
           {detail && (
             <ScrollArea className="max-h-[75vh] p-4 pt-2">
               <div className="space-y-4">
-                {/* Session info */}
                 <div className="text-xs text-muted-foreground space-y-1">
                   <p>Tipo: {detail.session.gameType.replace("_", " ")} • Blinds: {detail.session.blinds}</p>
                   <p>Início: {formatDateTime(detail.session.startedAt)}</p>
@@ -182,7 +323,6 @@ const HistoryPage = () => {
                   <p>Duração: {duration(detail.session)}</p>
                 </div>
 
-                {/* Summary cards */}
                 <div className="grid grid-cols-2 gap-2">
                   {[
                     { label: "Jogadores", value: detail.players.length, icon: Users, color: "text-foreground" },
@@ -200,7 +340,6 @@ const HistoryPage = () => {
 
                 <Separator />
 
-                {/* Player results */}
                 <div>
                   <h4 className="text-sm font-semibold text-poker-gold mb-2">Resultados por Jogador</h4>
                   <div className="space-y-2">
@@ -222,13 +361,11 @@ const HistoryPage = () => {
                               </div>
                             </div>
 
-                            {/* Timestamps */}
                             <div className="text-[10px] text-muted-foreground flex gap-3">
                               <span>Entrada: {formatTime(cp.joinedAt)}</span>
                               {cp.closedAt && <span>Saída: {formatTime(cp.closedAt)}</span>}
                             </div>
 
-                            {/* Transaction log with timestamps */}
                             {playerTxs.length > 0 && (
                               <div className="bg-background/50 rounded p-2 space-y-1">
                                 <p className="text-[10px] text-muted-foreground font-semibold mb-1">Movimentações:</p>

@@ -277,14 +277,24 @@ const ActiveCashGame = () => {
     }
   };
 
+  // Live timer
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!session || session.status !== "active") return;
+    const update = () => setElapsed(Math.floor((Date.now() - new Date(session.startedAt).getTime()) / 1000));
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [session]);
+
   if (!session) return <div className="p-8 text-center text-muted-foreground">Carregando...</div>;
 
   const totalChips = cashPlayers.reduce((sum, cp) => sum + cp.currentChips, 0);
   const totalBuyins = cashPlayers.reduce((sum, cp) => sum + cp.totalInvested, 0);
   const availablePlayersToAdd = allPlayers.filter(p => !cashPlayers.find(cp => cp.playerId === p.id && cp.isActive));
-  const elapsed = Math.floor((Date.now() - new Date(session.startedAt).getTime()) / 60000);
-  const hours = Math.floor(elapsed / 60);
-  const mins = elapsed % 60;
+  const hours = Math.floor(elapsed / 3600);
+  const mins = Math.floor((elapsed % 3600) / 60);
+  const secs = elapsed % 60;
 
   return (
     <div className="space-y-4">
@@ -297,9 +307,11 @@ const ActiveCashGame = () => {
           <h2 className="text-xl text-poker-gold">{session.name}</h2>
           <p className="text-xs text-muted-foreground">{session.blinds} • {session.gameType.replace("_", " ")}</p>
         </div>
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-          <Clock className="w-3 h-3" />
-          {hours}h{mins.toString().padStart(2, "0")}m
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20">
+          <Clock className="w-3.5 h-3.5 text-primary" />
+          <span className="text-sm font-mono font-bold text-primary tabular-nums">
+            {hours.toString().padStart(2, "0")}:{mins.toString().padStart(2, "0")}:{secs.toString().padStart(2, "0")}
+          </span>
         </div>
       </div>
 

@@ -1,12 +1,15 @@
 import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Spade, Loader2, Eye, EyeOff, AlertTriangle } from "lucide-react";
+import { Spade, Loader2, Eye, EyeOff, AlertTriangle, ArrowLeft, Mail } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
+
+type ViewMode = "login" | "forgot";
 
 const Login = () => {
   const { signIn, signUp, session, isLoading, isInactive, isSubscriptionBlocked } = useAuth();
@@ -18,8 +21,9 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [rememberMe, setRememberMe] = useState(!!savedEmail);
+  const [viewMode, setViewMode] = useState<ViewMode>("login");
+  const [resetSent, setResetSent] = useState(false);
 
-  // If already logged in, redirect to dashboard
   if (!isLoading && session) {
     return <Navigate to="/" replace />;
   }
@@ -44,7 +48,6 @@ const Login = () => {
       } else if (isSignUp) {
         toast({ title: "Conta criada!", description: "Verifique seu email para confirmar." });
       } else {
-        // Save or clear remembered email
         if (rememberMe) {
           localStorage.setItem("poker_remember_email", email);
         } else {
@@ -61,9 +64,32 @@ const Login = () => {
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) {
+      toast({ title: "Informe seu email", variant: "destructive" });
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/login`,
+      });
+      if (error) {
+        toast({ title: "Erro", description: error.message, variant: "destructive" });
+      } else {
+        setResetSent(true);
+        toast({ title: "Email enviado!", description: "Verifique sua caixa de entrada." });
+      }
+    } catch {
+      toast({ title: "Erro inesperado", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background effects */}
       <div className="absolute inset-0 bg-poker-felt opacity-50" />
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-primary/5 blur-3xl" />
       <div className="absolute bottom-0 left-0 right-0 h-1/3 bg-gradient-to-t from-background to-transparent" />
@@ -85,7 +111,6 @@ const Login = () => {
             </div>
           )}
 
-          {/* Inactive notification (non-subscription) */}
           {isInactive && !isSubscriptionBlocked && (
             <div className="flex items-start gap-3 p-4 rounded-lg bg-destructive/10 border border-destructive/30">
               <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
@@ -113,78 +138,145 @@ const Login = () => {
             </div>
           </div>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm text-muted-foreground font-sans normal-case tracking-normal">
-                Email
-              </label>
-              <Input
-                type="email"
-                placeholder="seu@email.com"
-                className="bg-muted border-border h-12"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={loading}
-              />
-            </div>
+          {viewMode === "forgot" ? (
+            /* Forgot Password View */
+            <div className="space-y-4">
+              <button
+                type="button"
+                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors font-sans normal-case tracking-normal"
+                onClick={() => { setViewMode("login"); setResetSent(false); }}
+              >
+                <ArrowLeft className="w-4 h-4" /> Voltar ao login
+              </button>
 
-            <div className="space-y-2">
-              <label className="text-sm text-muted-foreground font-sans normal-case tracking-normal">
-                Senha
-              </label>
-              <div className="relative">
-                <Input
-                  type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
-                  className="bg-muted border-border h-12 pr-12"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  disabled={loading}
-                />
+              {resetSent ? (
+                <div className="text-center space-y-3 py-4">
+                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+                    <Mail className="w-8 h-8 text-primary" />
+                  </div>
+                  <h3 className="text-lg font-semibold font-sans normal-case tracking-normal">
+                    Email enviado!
+                  </h3>
+                  <p className="text-sm text-muted-foreground font-sans normal-case tracking-normal">
+                    Enviamos um link de recuperação para <strong>{email}</strong>. Verifique sua caixa de entrada e spam.
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => { setResetSent(false); }}
+                  >
+                    Reenviar email
+                  </Button>
+                </div>
+              ) : (
+                <form onSubmit={handleForgotPassword} className="space-y-4">
+                  <h3 className="text-lg font-semibold text-center font-sans normal-case tracking-normal">
+                    Recuperar senha
+                  </h3>
+                  <p className="text-sm text-muted-foreground text-center font-sans normal-case tracking-normal">
+                    Informe seu email para receber o link de recuperação.
+                  </p>
+                  <Input
+                    type="email"
+                    placeholder="seu@email.com"
+                    className="bg-muted border-border h-12"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={loading}
+                  />
+                  <Button type="submit" className="w-full h-12 text-base font-display" disabled={loading}>
+                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Enviar link de recuperação"}
+                  </Button>
+                </form>
+              )}
+            </div>
+          ) : (
+            /* Login/SignUp View */
+            <>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm text-muted-foreground font-sans normal-case tracking-normal">
+                    Email
+                  </label>
+                  <Input
+                    type="email"
+                    placeholder="seu@email.com"
+                    className="bg-muted border-border h-12"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={loading}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm text-muted-foreground font-sans normal-case tracking-normal">
+                    Senha
+                  </label>
+                  <div className="relative">
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      className="bg-muted border-border h-12 pr-12"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      disabled={loading}
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  {!isSignUp && (
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="remember"
+                        checked={rememberMe}
+                        onCheckedChange={(checked) => setRememberMe(!!checked)}
+                      />
+                      <label htmlFor="remember" className="text-sm text-muted-foreground font-sans normal-case tracking-normal cursor-pointer">
+                        Lembrar email
+                      </label>
+                    </div>
+                  )}
+                  {!isSignUp && (
+                    <button
+                      type="button"
+                      className="text-xs text-primary hover:text-primary/80 transition-colors font-sans normal-case tracking-normal"
+                      onClick={() => setViewMode("forgot")}
+                    >
+                      Esqueci a senha
+                    </button>
+                  )}
+                </div>
+
+                <Button type="submit" className="w-full h-12 text-base font-display" disabled={loading}>
+                  {loading ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : isSignUp ? (
+                    "Criar Conta"
+                  ) : (
+                    "Entrar"
+                  )}
+                </Button>
+              </form>
+
+              <div className="text-center">
                 <button
                   type="button"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  onClick={() => setShowPassword(!showPassword)}
+                  className="text-sm text-muted-foreground hover:text-poker-gold transition-colors font-sans normal-case tracking-normal"
+                  onClick={() => setIsSignUp(!isSignUp)}
                 >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  {isSignUp ? "Já tem conta? Entrar" : "Não tem conta? Cadastre-se"}
                 </button>
               </div>
-            </div>
-
-            {!isSignUp && (
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="remember"
-                  checked={rememberMe}
-                  onCheckedChange={(checked) => setRememberMe(!!checked)}
-                />
-                <label htmlFor="remember" className="text-sm text-muted-foreground font-sans normal-case tracking-normal cursor-pointer">
-                  Lembrar meu email
-                </label>
-              </div>
-            )}
-
-            <Button type="submit" className="w-full h-12 text-base font-display" disabled={loading}>
-              {loading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : isSignUp ? (
-                "Criar Conta"
-              ) : (
-                "Entrar"
-              )}
-            </Button>
-          </form>
-
-          <div className="text-center">
-            <button
-              type="button"
-              className="text-sm text-muted-foreground hover:text-poker-gold transition-colors font-sans normal-case tracking-normal"
-              onClick={() => setIsSignUp(!isSignUp)}
-            >
-              {isSignUp ? "Já tem conta? Entrar" : "Não tem conta? Cadastre-se"}
-            </button>
-          </div>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>
