@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
+import { version } from "../../package.json";
 import { LayoutDashboard, Spade, Users, History, Wallet, LogOut, Shield, UserCog } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth, useAdmin } from "@/contexts/AuthContext";
