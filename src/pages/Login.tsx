@@ -122,7 +122,20 @@ const Login = () => {
               </div>
             </div>
 
-            <Button type="submit" className="w-full h-12 text-base font-display" disabled={loading}>
+            {!isSignUp && (
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="remember"
+                  checked={rememberMe}
+                  onCheckedChange={(checked) => setRememberMe(!!checked)}
+                />
+                <label htmlFor="remember" className="text-sm text-muted-foreground font-sans normal-case tracking-normal cursor-pointer">
+                  Lembrar meu email
+                </label>
+              </div>
+            )}
+
+
               {loading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : isSignUp ? (
