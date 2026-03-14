@@ -65,6 +65,8 @@ const AppContent = () => {
   );
 };
 
+import PWAUpdatePrompt from "./components/PWAUpdatePrompt";
+
 const App = () => {
   return (
     <ErrorBoundary>
@@ -72,6 +74,7 @@ const App = () => {
         <TooltipProvider>
           <Toaster />
           <Sonner />
+          <PWAUpdatePrompt />
           <BrowserRouter>
             <AuthProvider>
               <AppContent />
