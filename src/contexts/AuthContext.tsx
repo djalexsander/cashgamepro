@@ -26,6 +26,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isInactive, setIsInactive] = useState(false);
   const [isSubscriptionBlocked, setIsSubscriptionBlocked] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
+  const [fullName, setFullName] = useState<string | null>(null);
 
   const checkAdminAndActive = async (userId: string) => {
     try {
