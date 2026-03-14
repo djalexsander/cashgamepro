@@ -41,12 +41,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       const { data: profile, error: profileErr } = await supabase
         .from("profiles")
-        .select("active, subscription_status")
+        .select("active, subscription_status, full_name")
         .eq("id", userId)
         .maybeSingle();
       if (profileErr) console.error("Error checking profile:", profileErr);
 
       if (profile) {
+        setFullName(profile.full_name);
         setSubscriptionStatus(profile.subscription_status);
 
         if (profile.active === false) {
