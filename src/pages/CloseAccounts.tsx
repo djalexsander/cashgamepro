@@ -193,7 +193,7 @@ const CloseAccounts = () => {
         .footer { text-align: center; margin-top: 20px; font-size: 0.8em; color: #666; border-top: 2px dashed #333; padding-top: 10px; }
         .positive { color: green; } .negative { color: red; }
       </style></head><body>
-        <h2>🃏 Poker Manager</h2>
+        <h2>🃏 Cash Game Pro</h2>
         <p style="text-align:center;font-size:0.85em;">${receiptData.session}</p>
         <div class="row"><span>Jogador:</span><span><b>${receiptData.name}</b></span></div>
         <div class="row"><span>Investido:</span><span>R$ ${receiptData.invested.toFixed(2)}</span></div>
