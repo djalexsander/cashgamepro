@@ -19,8 +19,8 @@ export default defineConfig(({ mode }) => ({
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg"],
       manifest: {
-        name: "Poker Manager - Cash Game Pro",
-        short_name: "Poker Manager",
+        name: "Cash Game Pro",
+        short_name: "Cash Game Pro",
         description: "Gerenciador profissional de Cash Game de Poker",
         theme_color: "#0d1a12",
         background_color: "#0d1a12",
