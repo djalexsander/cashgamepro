@@ -203,7 +203,7 @@ const CloseAccounts = () => {
         </div>
         <div class="row"><span>Data:</span><span>${receiptData.date}</span></div>
         <div class="footer">
-          <p>Poker Manager - Cash Game Pro</p>
+          <p>Cash Game Pro</p>
           <p>Documento gerado automaticamente</p>
         </div>
         <script>setTimeout(() => window.print(), 300);</script>
