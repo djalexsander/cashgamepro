@@ -193,13 +193,16 @@ const Login = () => {
           ) : (
             /* Login/SignUp View */
             <>
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-4" autoComplete="on">
                 <div className="space-y-2">
-                  <label className="text-sm text-muted-foreground font-sans normal-case tracking-normal">
+                  <label htmlFor="login-email" className="text-sm text-muted-foreground font-sans normal-case tracking-normal">
                     Email
                   </label>
                   <Input
+                    id="login-email"
+                    name="email"
                     type="email"
+                    autoComplete="email"
                     placeholder="seu@email.com"
                     className="bg-muted border-border h-12"
                     value={email}
@@ -209,12 +212,15 @@ const Login = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm text-muted-foreground font-sans normal-case tracking-normal">
+                  <label htmlFor="login-password" className="text-sm text-muted-foreground font-sans normal-case tracking-normal">
                     Senha
                   </label>
                   <div className="relative">
                     <Input
+                      id="login-password"
+                      name="password"
                       type={showPassword ? "text" : "password"}
+                      autoComplete="current-password"
                       placeholder="••••••••"
                       className="bg-muted border-border h-12 pr-12"
                       value={password}
