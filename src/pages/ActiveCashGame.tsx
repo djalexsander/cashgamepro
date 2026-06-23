@@ -87,6 +87,103 @@ const ActiveCashGame = () => {
 
   useEffect(() => { load(); }, [id]);
 
+  // Build the printable HTML for a player's financial summary
+  const buildSummaryHtml = (sp: (DBCashPlayer & { player?: DBPlayer })) => {
+    if (!session) return "";
+    const result = sp.result ?? 0;
+    const positive = result >= 0;
+    const minutes = sp.closedAt
+      ? Math.floor((new Date(sp.closedAt).getTime() - new Date(sp.joinedAt).getTime()) / 60000)
+      : 0;
+    const timePlayed = `${Math.floor(minutes / 60)}h${(minutes % 60).toString().padStart(2, "0")}m`;
+    const paymentLabel = sp.paymentStatus === "paid" ? "Pago" : sp.paymentStatus === "received" ? "Recebido" : "Pendente";
+    const playerTxs = transactions
+      .filter(t => t.cashPlayerId === sp.id)
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    const txRows = playerTxs.map(tx =>
+      `<div class="row"><span>${formatTime(tx.timestamp)} ${txLabelMap[tx.type] ?? tx.type}</span><span>R$ ${tx.amount.toFixed(2)}</span></div>`
+    ).join("");
+    return `
+      <html><head><title>Resumo - ${sp.player?.name ?? "Jogador"}</title><style>
+        body { font-family: monospace; padding: 20px; max-width: 350px; margin: 0 auto; }
+        h2 { text-align: center; border-bottom: 2px dashed #333; padding-bottom: 10px; }
+        .row { display: flex; justify-content: space-between; padding: 4px 0; }
+        .result { font-size: 1.3em; font-weight: bold; text-align: center; margin: 16px 0; }
+        .footer { text-align: center; margin-top: 20px; font-size: 0.8em; color: #666; border-top: 2px dashed #333; padding-top: 10px; }
+        .sub { border-top: 1px dashed #999; margin-top: 10px; padding-top: 6px; }
+        .positive { color: green; } .negative { color: red; }
+      </style></head><body>
+        <h2>🃏 Cash Game Pro</h2>
+        <p style="text-align:center;font-size:0.85em;">${session.name} • ${session.blinds}</p>
+        <div class="row"><span>Jogador:</span><span><b>${sp.player?.name ?? "Jogador"}</b></span></div>
+        <div class="row"><span>Buy-in inicial:</span><span>R$ ${sp.initialBuyin.toFixed(2)}</span></div>
+        <div class="row"><span>Total investido:</span><span>R$ ${sp.totalInvested.toFixed(2)}</span></div>
+        <div class="row"><span>Fichas finais:</span><span>R$ ${(sp.finalChips ?? 0).toFixed(2)}</span></div>
+        <div class="row"><span>Tempo jogado:</span><span>${timePlayed}</span></div>
+        <div class="row"><span>Pagamento:</span><span>${paymentLabel}</span></div>
+        ${txRows ? `<div class="sub"><b>Movimentações</b>${txRows}</div>` : ""}
+        <div class="result ${positive ? "positive" : "negative"}">
+          Resultado: R$ ${positive ? "+" : ""}${result.toFixed(2)}
+        </div>
+        <div class="footer"><p>Cash Game Pro</p><p>Documento gerado automaticamente</p></div>
+      </body></html>
+    `;
+  };
+
+  // Print using a hidden iframe — works inside PWA/standalone and avoids
+  // the infinite-print loop that happens when printing the React document.
+  const printSummary = (sp: (DBCashPlayer & { player?: DBPlayer }) | null) => {
+    if (!sp || !session) return;
+    const html = buildSummaryHtml(sp);
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    document.body.appendChild(iframe);
+
+    const cleanup = () => {
+      setTimeout(() => {
+        if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+      }, 500);
+    };
+
+    const doc = iframe.contentWindow?.document;
+    if (!doc) { cleanup(); return; }
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    const win = iframe.contentWindow;
+    if (!win) { cleanup(); return; }
+    // Print only once the iframe content has loaded.
+    let printed = false;
+    const triggerPrint = () => {
+      if (printed) return;
+      printed = true;
+      win.focus();
+      win.print();
+      cleanup();
+    };
+    win.onafterprint = cleanup;
+    setTimeout(triggerPrint, 350);
+  };
+
+  // F10 keyboard shortcut to print the open financial summary
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "F10" && summaryOpen && summaryPlayer) {
+        e.preventDefault();
+        printSummary(summaryPlayer);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [summaryOpen, summaryPlayer]);
+
   const handleAddPlayer = async () => {
     if (!selectedPlayerId) {
       toast({ title: "Erro", description: "Selecione um jogador.", variant: "destructive" });
