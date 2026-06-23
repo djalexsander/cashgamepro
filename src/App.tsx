@@ -13,6 +13,7 @@ import ActiveCashGame from "./pages/ActiveCashGame";
 import CloseAccounts from "./pages/CloseAccounts";
 import ManageUsers from "./pages/ManageUsers";
 import Login from "./pages/Login";
+import HomePokerGuide from "./pages/HomePokerGuide";
 import NotFound from "./pages/NotFound";
 import ErrorBoundary from "./components/ErrorBoundary";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -44,6 +45,7 @@ const AppContent = () => {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/guides/home-poker-management" element={<HomePokerGuide />} />
       <Route
         element={
           <ProtectedRoute>
