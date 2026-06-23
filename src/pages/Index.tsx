@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { db, type DBCashSession, type DBCashPlayer, type DBTransaction } from "@/db/database";
+import Seo from "@/components/Seo";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -70,6 +71,11 @@ const Index = () => {
 
   return (
     <div className="space-y-6">
+      <Seo
+        title="Painel — Cash Game Pro"
+        description="Painel principal do Cash Game Pro: acompanhe sessões ativas, rake total e atividades recentes em tempo real."
+        path="/"
+      />
       <Button
         onClick={() => navigate("/cash-games/new")}
         className="w-full h-16 text-lg font-display glow-green"
@@ -218,6 +224,7 @@ const Index = () => {
                   <Button
                     variant="ghost"
                     size="icon"
+                    aria-label="Excluir atividade"
                     className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
                     onClick={() => setDeleteTarget(tx.id!.toString())}
                   >

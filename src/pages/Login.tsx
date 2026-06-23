@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Spade, Loader2, Eye, EyeOff, AlertTriangle, ArrowLeft, Mail } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
+import Seo from "@/components/Seo";
 
 type ViewMode = "login" | "forgot";
 
@@ -90,6 +91,11 @@ const Login = () => {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
+      <Seo
+        title="Entrar — Cash Game Pro"
+        description="Acesse o Cash Game Pro para gerenciar suas partidas de poker, controlar buy-ins, rake e pagamentos."
+        path="/login"
+      />
       <div className="absolute inset-0 bg-poker-felt opacity-50" />
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-primary/5 blur-3xl" />
       <div className="absolute bottom-0 left-0 right-0 h-1/3 bg-gradient-to-t from-background to-transparent" />
