@@ -8,6 +8,10 @@ Cash Game Pro é um aplicativo para organizar partidas de poker em formato cash 
 
 - [Entrar](/login): Tela de acesso ao aplicativo.
 
+## Guides
+
+- [Como organizar um cash game de poker em casa](/guides/home-poker-management): Guia completo de buy-ins, rake, fichas e fechamento de contas.
+
 ## Optional
 
 - O painel principal, jogadores, cash games e histórico exigem autenticação e não estão disponíveis publicamente.
