@@ -202,11 +202,12 @@ const ActiveCashGame = () => {
           win.focus();
           win.print();
         } finally {
-          cleanup();
+          setTimeout(cleanup, 30000);
         }
       }, 100);
     };
 
+    win.onafterprint = cleanup;
     window.addEventListener("message", onMessage);
     doc.open();
     doc.write(html.replace("</body>", `<script>window.onload=function(){parent.postMessage('cash-game-pro-print-ready','*')};<\/script></body>`));
@@ -220,7 +221,7 @@ const ActiveCashGame = () => {
           win.focus();
           win.print();
         } finally {
-          cleanup();
+          setTimeout(cleanup, 30000);
         }
       }
     }, 1000);
