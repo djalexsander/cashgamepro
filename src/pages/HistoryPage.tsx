@@ -14,6 +14,7 @@ import {
   TrendingUp, TrendingDown, ArrowUpCircle, ArrowDownCircle, RotateCcw, LogIn, LogOut, Trash2
 } from "lucide-react";
 import { db, type DBCashSession, type DBCashPlayer, type DBPlayer, type DBTransaction } from "@/db/database";
+import Seo from "@/components/Seo";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -144,6 +145,11 @@ const HistoryPage = () => {
 
   return (
     <div className="space-y-4">
+      <Seo
+        title="Histórico de Partidas — Cash Game Pro"
+        description="Consulte o histórico completo de partidas de poker, com rake, duração e detalhes de cada sessão."
+        path="/history"
+      />
       <div className="flex items-center justify-between">
         <h2 className="text-2xl text-poker-gold">Histórico</h2>
         <div className="flex items-center gap-2">

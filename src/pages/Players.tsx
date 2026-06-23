@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { db, type DBPlayer } from "@/db/database";
 import PlayerModal from "@/components/PlayerModal";
 import { toast } from "@/hooks/use-toast";
+import Seo from "@/components/Seo";
 
 const Players = () => {
   const [players, setPlayers] = useState<DBPlayer[]>([]);
@@ -43,6 +44,11 @@ const Players = () => {
 
   return (
     <div className="space-y-6">
+      <Seo
+        title="Jogadores — Cash Game Pro"
+        description="Cadastre e gerencie os jogadores das suas partidas de poker no Cash Game Pro."
+        path="/players"
+      />
       <div className="flex items-center justify-between">
         <h2 className="text-2xl text-poker-gold">Jogadores</h2>
         <Button size="sm" className="font-display" onClick={() => { setEditPlayer(null); setModalOpen(true); }}>
