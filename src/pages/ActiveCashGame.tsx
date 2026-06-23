@@ -590,7 +590,12 @@ const ActiveCashGame = () => {
               Adicionar Jogador
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div
+            className="space-y-4"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") { e.preventDefault(); handleAddPlayer(); }
+            }}
+          >
             <div className="space-y-2">
               <Label>Jogador</Label>
               <Select value={selectedPlayerId} onValueChange={setSelectedPlayerId}>
