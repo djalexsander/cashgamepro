@@ -42,6 +42,10 @@ const ActiveCashGame = () => {
   const [closeTargetId, setCloseTargetId] = useState("");
   const [finalChips, setFinalChips] = useState("");
 
+  // Player financial summary dialog (after closing)
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  const [summaryPlayer, setSummaryPlayer] = useState<(DBCashPlayer & { player?: DBPlayer }) | null>(null);
+
   // End session summary dialog
   const [endSessionOpen, setEndSessionOpen] = useState(false);
 
