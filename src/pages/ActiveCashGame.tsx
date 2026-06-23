@@ -151,41 +151,63 @@ const ActiveCashGame = () => {
   // the infinite-print loop that happens when printing the React document.
   const printSummary = (sp: (DBCashPlayer & { player?: DBPlayer }) | null) => {
     if (!sp || !session) return;
+    if (printInProgressRef.current) return;
+    printInProgressRef.current = true;
+
     const html = buildSummaryHtml(sp);
     const iframe = document.createElement("iframe");
     iframe.style.position = "fixed";
-    iframe.style.right = "0";
-    iframe.style.bottom = "0";
-    iframe.style.width = "0";
-    iframe.style.height = "0";
+    iframe.style.left = "-10000px";
+    iframe.style.top = "0";
+    iframe.style.width = "80mm";
+    iframe.style.height = "100vh";
     iframe.style.border = "0";
+    iframe.setAttribute("aria-hidden", "true");
     document.body.appendChild(iframe);
 
+    let cleaned = false;
     const cleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
       setTimeout(() => {
         if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+        printInProgressRef.current = false;
       }, 500);
     };
 
     const doc = iframe.contentWindow?.document;
-    if (!doc) { cleanup(); return; }
+    const win = iframe.contentWindow;
+    if (!doc || !win) { cleanup(); return; }
+
+    const onMessage = (event: MessageEvent) => {
+      if (event.source !== win || event.data !== "cash-game-pro-print-ready") return;
+      window.removeEventListener("message", onMessage);
+      setTimeout(() => {
+        try {
+          win.focus();
+          win.print();
+        } finally {
+          cleanup();
+        }
+      }, 100);
+    };
+
+    window.addEventListener("message", onMessage);
     doc.open();
-    doc.write(html);
+    doc.write(html.replace("</body>", `<script>window.onload=function(){parent.postMessage('cash-game-pro-print-ready','*')};<\/script></body>`));
     doc.close();
 
-    const win = iframe.contentWindow;
-    if (!win) { cleanup(); return; }
-    // Print only once the iframe content has loaded.
-    let printed = false;
-    const triggerPrint = () => {
-      if (printed) return;
-      printed = true;
-      win.focus();
-      win.print();
-      cleanup();
-    };
-    win.onafterprint = cleanup;
-    setTimeout(triggerPrint, 350);
+    setTimeout(() => {
+      window.removeEventListener("message", onMessage);
+      if (!cleaned) {
+        try {
+          win.focus();
+          win.print();
+        } finally {
+          cleanup();
+        }
+      }
+    }, 1000);
   };
 
   // F10 keyboard shortcut to print the open financial summary
