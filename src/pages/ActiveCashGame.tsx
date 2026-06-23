@@ -12,7 +12,8 @@ import PlayerModal from "@/components/PlayerModal";
 import {
   ArrowLeft, Plus, Users, DollarSign, Clock, Spade,
   PlusCircle, MinusCircle, RotateCcw, Lock, UserPlus, AlertTriangle,
-  ClipboardList, LogIn, LogOut, ArrowUpCircle, ArrowDownCircle
+  ClipboardList, LogIn, LogOut, ArrowUpCircle, ArrowDownCircle,
+  TrendingUp, TrendingDown, Wallet, Printer, CheckCircle2
 } from "lucide-react";
 
 const ActiveCashGame = () => {
