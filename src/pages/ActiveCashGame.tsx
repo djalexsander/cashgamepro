@@ -172,18 +172,33 @@ const ActiveCashGame = () => {
       setTimeout(() => {
         if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
         printInProgressRef.current = false;
-      }, 500);
+      }, 2500);
     };
 
     const doc = iframe.contentWindow?.document;
     const win = iframe.contentWindow;
     if (!doc || !win) { cleanup(); return; }
 
+    const prepareReceiptSize = () => {
+      const receipt = doc.querySelector(".receipt") as HTMLElement | null;
+      const heightPx = Math.max(
+        doc.body?.scrollHeight ?? 0,
+        doc.documentElement?.scrollHeight ?? 0,
+        receipt?.scrollHeight ?? 0,
+      );
+      const heightMm = Math.max(80, Math.ceil(heightPx * 0.264583) + 16);
+      const pageStyle = doc.createElement("style");
+      pageStyle.textContent = `@page { size: 80mm ${heightMm}mm; margin: 4mm; }`;
+      doc.head.appendChild(pageStyle);
+      iframe.style.height = `${heightPx + 80}px`;
+    };
+
     const onMessage = (event: MessageEvent) => {
       if (event.source !== win || event.data !== "cash-game-pro-print-ready") return;
       window.removeEventListener("message", onMessage);
       setTimeout(() => {
         try {
+          prepareReceiptSize();
           win.focus();
           win.print();
         } finally {
@@ -201,6 +216,7 @@ const ActiveCashGame = () => {
       window.removeEventListener("message", onMessage);
       if (!cleaned) {
         try {
+          prepareReceiptSize();
           win.focus();
           win.print();
         } finally {
@@ -213,7 +229,7 @@ const ActiveCashGame = () => {
   // F10 keyboard shortcut to print the open financial summary
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "F10" && summaryOpen && summaryPlayer) {
+      if (e.key === "F10" && !e.repeat && summaryOpen && summaryPlayer) {
         e.preventDefault();
         printSummary(summaryPlayer);
       }
