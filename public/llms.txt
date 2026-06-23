@@ -1,0 +1,13 @@
+# Cash Game Pro
+
+> Gerenciador profissional de Cash Game de Poker: controle financeiro completo, relatórios e acompanhamento de sessões em tempo real.
+
+Cash Game Pro é um aplicativo para organizar partidas de poker em formato cash game. Permite registrar jogadores, controlar buy-ins, rake e pagamentos, fechar contas e consultar o histórico de partidas. O acesso ao painel exige login.
+
+## Pages
+
+- [Entrar](/login): Tela de acesso ao aplicativo.
+
+## Optional
+
+- O painel principal, jogadores, cash games e histórico exigem autenticação e não estão disponíveis publicamente.
