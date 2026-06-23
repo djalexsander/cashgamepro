@@ -166,6 +166,7 @@ const ActiveCashGame = () => {
     document.body.appendChild(iframe);
 
     let cleaned = false;
+    let printed = false;
     const cleanup = () => {
       if (cleaned) return;
       cleaned = true;
@@ -193,18 +194,22 @@ const ActiveCashGame = () => {
       iframe.style.height = `${heightPx + 80}px`;
     };
 
+    const triggerPrint = () => {
+      if (printed || cleaned) return;
+      printed = true;
+      try {
+        prepareReceiptSize();
+        win.focus();
+        win.print();
+      } finally {
+        setTimeout(cleanup, 30000);
+      }
+    };
+
     const onMessage = (event: MessageEvent) => {
       if (event.source !== win || event.data !== "cash-game-pro-print-ready") return;
       window.removeEventListener("message", onMessage);
-      setTimeout(() => {
-        try {
-          prepareReceiptSize();
-          win.focus();
-          win.print();
-        } finally {
-          setTimeout(cleanup, 30000);
-        }
-      }, 100);
+      setTimeout(triggerPrint, 100);
     };
 
     win.onafterprint = cleanup;
@@ -215,15 +220,7 @@ const ActiveCashGame = () => {
 
     setTimeout(() => {
       window.removeEventListener("message", onMessage);
-      if (!cleaned) {
-        try {
-          prepareReceiptSize();
-          win.focus();
-          win.print();
-        } finally {
-          setTimeout(cleanup, 30000);
-        }
-      }
+      triggerPrint();
     }, 1000);
   };
 
