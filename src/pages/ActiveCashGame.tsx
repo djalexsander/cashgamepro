@@ -882,39 +882,12 @@ const ActiveCashGame = () => {
                   <Button variant="outline" onClick={() => setSummaryOpen(false)}>Fechar</Button>
                   <Button
                     className="glow-green"
-                    onClick={() => {
-                      const w = window.open("", "_blank", "width=400,height=560");
-                      if (!w) return;
-                      w.document.write(`
-                        <html><head><title>Resumo - ${summaryPlayer.player?.name ?? "Jogador"}</title><style>
-                          body { font-family: monospace; padding: 20px; max-width: 350px; margin: 0 auto; }
-                          h2 { text-align: center; border-bottom: 2px dashed #333; padding-bottom: 10px; }
-                          .row { display: flex; justify-content: space-between; padding: 4px 0; }
-                          .result { font-size: 1.3em; font-weight: bold; text-align: center; margin: 16px 0; }
-                          .footer { text-align: center; margin-top: 20px; font-size: 0.8em; color: #666; border-top: 2px dashed #333; padding-top: 10px; }
-                          .positive { color: green; } .negative { color: red; }
-                        </style></head><body>
-                          <h2>🃏 Cash Game Pro</h2>
-                          <p style="text-align:center;font-size:0.85em;">${session.name} • ${session.blinds}</p>
-                          <div class="row"><span>Jogador:</span><span><b>${summaryPlayer.player?.name ?? "Jogador"}</b></span></div>
-                          <div class="row"><span>Buy-in inicial:</span><span>R$ ${summaryPlayer.initialBuyin.toFixed(2)}</span></div>
-                          <div class="row"><span>Total investido:</span><span>R$ ${summaryPlayer.totalInvested.toFixed(2)}</span></div>
-                          <div class="row"><span>Fichas finais:</span><span>R$ ${(summaryPlayer.finalChips ?? 0).toFixed(2)}</span></div>
-                          <div class="row"><span>Tempo jogado:</span><span>${timePlayed}</span></div>
-                          <div class="row"><span>Pagamento:</span><span>${paymentLabel}</span></div>
-                          <div class="result ${positive ? "positive" : "negative"}">
-                            Resultado: R$ ${positive ? "+" : ""}${result.toFixed(2)}
-                          </div>
-                          <div class="footer"><p>Cash Game Pro</p><p>Documento gerado automaticamente</p></div>
-                          <script>setTimeout(() => window.print(), 300);</script>
-                        </body></html>
-                      `);
-                      w.document.close();
-                    }}
+                    onClick={() => printSummary(summaryPlayer)}
                   >
-                    <Printer className="w-4 h-4 mr-1" /> Imprimir
+                    <Printer className="w-4 h-4 mr-1" /> Imprimir <span className="ml-1 text-[10px] opacity-70">(F10)</span>
                   </Button>
                 </DialogFooter>
+
               </div>
             );
           })()}
