@@ -618,7 +618,6 @@ const ActiveCashGame = () => {
                 type="number"
                 value={initialBuyin}
                 onChange={(e) => setInitialBuyin(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddPlayer(); } }}
                 placeholder="100"
                 className="bg-muted border-border"
               />
