@@ -664,7 +664,7 @@ const ActiveCashGame = () => {
             })()}
             <div className="space-y-2">
               <Label>Fichas Finais (R$)</Label>
-              <Input type="number" value={finalChips} onChange={(e) => setFinalChips(e.target.value)} placeholder="0" className="bg-muted border-border" />
+              <Input type="number" value={finalChips} onChange={(e) => setFinalChips(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleClosePlayer(); } }} placeholder="0" className="bg-muted border-border" />
             </div>
           </div>
           <DialogFooter>
