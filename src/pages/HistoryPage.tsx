@@ -289,6 +289,7 @@ const HistoryPage = () => {
                     <Button
                       variant="ghost"
                       size="icon"
+                      aria-label="Excluir partida do histórico"
                       className="h-7 w-7 text-muted-foreground hover:text-destructive"
                       onClick={(e) => { e.stopPropagation(); setDeleteTarget(s.id); }}
                     >

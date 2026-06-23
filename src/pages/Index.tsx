@@ -218,6 +218,7 @@ const Index = () => {
                   <Button
                     variant="ghost"
                     size="icon"
+                    aria-label="Excluir atividade"
                     className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
                     onClick={() => setDeleteTarget(tx.id!.toString())}
                   >

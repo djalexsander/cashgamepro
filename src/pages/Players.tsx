@@ -85,10 +85,10 @@ const Players = () => {
                   </div>
                 </div>
                 <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" onClick={() => { setEditPlayer(player); setModalOpen(true); }}>
+                  <Button variant="ghost" size="icon" aria-label={`Editar jogador ${player.name}`} onClick={() => { setEditPlayer(player); setModalOpen(true); }}>
                     <Edit className="w-4 h-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" onClick={() => handleDelete(player)}>
+                  <Button variant="ghost" size="icon" aria-label={`Excluir jogador ${player.name}`} onClick={() => handleDelete(player)}>
                     <Trash2 className="w-4 h-4 text-destructive" />
                   </Button>
                 </div>

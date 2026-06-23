@@ -32,7 +32,7 @@ const Layout = () => {
             <Spade className="w-6 h-6 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-lg leading-tight text-poker-gold">Cash Game Pro</h1>
+            <h1 className="text-lg leading-tight text-poker-gold">Cash Game Pro — Gerenciador de Poker</h1>
             <p className="text-xs text-muted-foreground font-sans normal-case tracking-normal">Cash Game Pro v{version}</p>
           </div>
         </div>
@@ -61,7 +61,7 @@ const Layout = () => {
               </div>
             </>
           )}
-          <Button variant="ghost" size="icon" onClick={handleLogout} title="Sair">
+          <Button variant="ghost" size="icon" onClick={handleLogout} title="Sair" aria-label="Sair da conta">
             <LogOut className="w-5 h-5 text-muted-foreground" />
           </Button>
         </div>
