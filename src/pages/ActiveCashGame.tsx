@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,7 @@ const ActiveCashGame = () => {
   // Player financial summary dialog (after closing)
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [summaryPlayer, setSummaryPlayer] = useState<(DBCashPlayer & { player?: DBPlayer }) | null>(null);
+  const printInProgressRef = useRef(false);
 
   // End session summary dialog
   const [endSessionOpen, setEndSessionOpen] = useState(false);
@@ -53,6 +54,12 @@ const ActiveCashGame = () => {
   const [expandedPlayerTx, setExpandedPlayerTx] = useState<string | null>(null);
 
   const formatTime = (iso: string) => new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  const escapeHtml = (value: string) => value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 
   const txLabelMap: Record<string, string> = {
     buyin: "Buy-in", rebuy: "Rebuy", addon: "Add Fichas", withdrawal: "Retirada", cashout: "Cash Out",
@@ -101,21 +108,30 @@ const ActiveCashGame = () => {
       .filter(t => t.cashPlayerId === sp.id)
       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
     const txRows = playerTxs.map(tx =>
-      `<div class="row"><span>${formatTime(tx.timestamp)} ${txLabelMap[tx.type] ?? tx.type}</span><span>R$ ${tx.amount.toFixed(2)}</span></div>`
+      `<div class="row"><span>${formatTime(tx.timestamp)} ${escapeHtml(txLabelMap[tx.type] ?? tx.type)}</span><strong>R$ ${tx.amount.toFixed(2)}</strong></div>`
     ).join("");
     return `
-      <html><head><title>Resumo - ${sp.player?.name ?? "Jogador"}</title><style>
-        body { font-family: monospace; padding: 20px; max-width: 350px; margin: 0 auto; }
-        h2 { text-align: center; border-bottom: 2px dashed #333; padding-bottom: 10px; }
-        .row { display: flex; justify-content: space-between; padding: 4px 0; }
-        .result { font-size: 1.3em; font-weight: bold; text-align: center; margin: 16px 0; }
-        .footer { text-align: center; margin-top: 20px; font-size: 0.8em; color: #666; border-top: 2px dashed #333; padding-top: 10px; }
-        .sub { border-top: 1px dashed #999; margin-top: 10px; padding-top: 6px; }
-        .positive { color: green; } .negative { color: red; }
+      <!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Resumo - ${escapeHtml(sp.player?.name ?? "Jogador")}</title><style>
+        @page { size: auto; margin: 4mm; }
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; background: #fff; color: #111; }
+        body { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; width: 100%; padding: 4mm; font-size: 12px; line-height: 1.35; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .receipt { width: 72mm; max-width: 100%; margin: 0 auto; overflow: visible; }
+        h2 { text-align: center; border-bottom: 1px dashed #333; padding: 0 0 8px; margin: 0 0 6px; font-size: 16px; }
+        p { margin: 4px 0; }
+        .row { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; break-inside: avoid; page-break-inside: avoid; }
+        .row span:first-child { flex: 1 1 auto; overflow-wrap: anywhere; }
+        .row span:last-child, .row strong { flex: 0 0 auto; text-align: right; white-space: nowrap; }
+        .result { font-size: 1.18em; font-weight: bold; text-align: center; margin: 12px 0; padding: 8px 0; border-top: 1px dashed #999; border-bottom: 1px dashed #999; break-inside: avoid; page-break-inside: avoid; }
+        .footer { text-align: center; margin-top: 12px; font-size: 0.82em; color: #555; border-top: 1px dashed #333; padding-top: 8px; break-inside: avoid; page-break-inside: avoid; }
+        .sub { border-top: 1px dashed #999; margin-top: 8px; padding-top: 6px; }
+        .positive { color: #047857; } .negative { color: #dc2626; }
+        @media print { body { width: auto; } .receipt { margin: 0; } }
       </style></head><body>
-        <h2>🃏 Cash Game Pro</h2>
-        <p style="text-align:center;font-size:0.85em;">${session.name} • ${session.blinds}</p>
-        <div class="row"><span>Jogador:</span><span><b>${sp.player?.name ?? "Jogador"}</b></span></div>
+        <main class="receipt">
+        <h2>Cash Game Pro</h2>
+        <p style="text-align:center;font-size:0.9em;">${escapeHtml(session.name)} • ${escapeHtml(session.blinds)}</p>
+        <div class="row"><span>Jogador:</span><strong>${escapeHtml(sp.player?.name ?? "Jogador")}</strong></div>
         <div class="row"><span>Buy-in inicial:</span><span>R$ ${sp.initialBuyin.toFixed(2)}</span></div>
         <div class="row"><span>Total investido:</span><span>R$ ${sp.totalInvested.toFixed(2)}</span></div>
         <div class="row"><span>Fichas finais:</span><span>R$ ${(sp.finalChips ?? 0).toFixed(2)}</span></div>
@@ -126,6 +142,7 @@ const ActiveCashGame = () => {
           Resultado: R$ ${positive ? "+" : ""}${result.toFixed(2)}
         </div>
         <div class="footer"><p>Cash Game Pro</p><p>Documento gerado automaticamente</p></div>
+        </main>
       </body></html>
     `;
   };
@@ -134,47 +151,83 @@ const ActiveCashGame = () => {
   // the infinite-print loop that happens when printing the React document.
   const printSummary = (sp: (DBCashPlayer & { player?: DBPlayer }) | null) => {
     if (!sp || !session) return;
+    if (printInProgressRef.current) return;
+    printInProgressRef.current = true;
+
     const html = buildSummaryHtml(sp);
     const iframe = document.createElement("iframe");
     iframe.style.position = "fixed";
-    iframe.style.right = "0";
-    iframe.style.bottom = "0";
-    iframe.style.width = "0";
-    iframe.style.height = "0";
+    iframe.style.left = "-10000px";
+    iframe.style.top = "0";
+    iframe.style.width = "80mm";
+    iframe.style.height = "100vh";
     iframe.style.border = "0";
+    iframe.setAttribute("aria-hidden", "true");
     document.body.appendChild(iframe);
 
+    let cleaned = false;
+    let printed = false;
     const cleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
       setTimeout(() => {
         if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-      }, 500);
+        printInProgressRef.current = false;
+      }, 2500);
     };
 
     const doc = iframe.contentWindow?.document;
-    if (!doc) { cleanup(); return; }
+    const win = iframe.contentWindow;
+    if (!doc || !win) { cleanup(); return; }
+
+    const prepareReceiptSize = () => {
+      const receipt = doc.querySelector(".receipt") as HTMLElement | null;
+      const heightPx = Math.max(
+        doc.body?.scrollHeight ?? 0,
+        doc.documentElement?.scrollHeight ?? 0,
+        receipt?.scrollHeight ?? 0,
+      );
+      const heightMm = Math.max(80, Math.ceil(heightPx * 0.264583) + 16);
+      const pageStyle = doc.createElement("style");
+      pageStyle.textContent = `@page { size: 80mm ${heightMm}mm; margin: 4mm; }`;
+      doc.head.appendChild(pageStyle);
+      iframe.style.height = `${heightPx + 80}px`;
+    };
+
+    const triggerPrint = () => {
+      if (printed || cleaned) return;
+      printed = true;
+      try {
+        prepareReceiptSize();
+        win.focus();
+        win.print();
+      } finally {
+        setTimeout(cleanup, 30000);
+      }
+    };
+
+    const onMessage = (event: MessageEvent) => {
+      if (event.source !== win || event.data !== "cash-game-pro-print-ready") return;
+      window.removeEventListener("message", onMessage);
+      setTimeout(triggerPrint, 100);
+    };
+
+    win.onafterprint = cleanup;
+    window.addEventListener("message", onMessage);
     doc.open();
-    doc.write(html);
+    doc.write(html.replace("</body>", `<script>window.onload=function(){parent.postMessage('cash-game-pro-print-ready','*')};<\/script></body>`));
     doc.close();
 
-    const win = iframe.contentWindow;
-    if (!win) { cleanup(); return; }
-    // Print only once the iframe content has loaded.
-    let printed = false;
-    const triggerPrint = () => {
-      if (printed) return;
-      printed = true;
-      win.focus();
-      win.print();
-      cleanup();
-    };
-    win.onafterprint = cleanup;
-    setTimeout(triggerPrint, 350);
+    setTimeout(() => {
+      window.removeEventListener("message", onMessage);
+      triggerPrint();
+    }, 1000);
   };
 
   // F10 keyboard shortcut to print the open financial summary
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "F10" && summaryOpen && summaryPlayer) {
+      if (e.key === "F10" && !e.repeat && summaryOpen && summaryPlayer) {
         e.preventDefault();
         printSummary(summaryPlayer);
       }
