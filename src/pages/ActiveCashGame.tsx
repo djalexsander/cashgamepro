@@ -636,7 +636,7 @@ const ActiveCashGame = () => {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Valor (R$)</Label>
-              <Input type="number" value={chipsAmount} onChange={(e) => setChipsAmount(e.target.value)} placeholder="50" className="bg-muted border-border" />
+              <Input type="number" value={chipsAmount} onChange={(e) => setChipsAmount(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleChipsAction(); } }} placeholder="50" className="bg-muted border-border" />
             </div>
           </div>
           <DialogFooter>
