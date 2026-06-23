@@ -203,6 +203,15 @@ const ActiveCashGame = () => {
       toast({ title: "Jogador fechado!", description: `Resultado: R$ ${result >= 0 ? "+" : ""}${result.toFixed(2)}` });
       setClosePlayerOpen(false);
       setFinalChips("");
+      setSummaryPlayer({
+        ...cp,
+        finalChips: chips,
+        result,
+        isActive: false,
+        closedAt: new Date().toISOString(),
+        currentChips: chips,
+      });
+      setSummaryOpen(true);
       load();
     } catch (error) {
       console.error("Erro:", error);
