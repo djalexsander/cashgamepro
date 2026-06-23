@@ -12,7 +12,8 @@ import PlayerModal from "@/components/PlayerModal";
 import {
   ArrowLeft, Plus, Users, DollarSign, Clock, Spade,
   PlusCircle, MinusCircle, RotateCcw, Lock, UserPlus, AlertTriangle,
-  ClipboardList, LogIn, LogOut, ArrowUpCircle, ArrowDownCircle
+  ClipboardList, LogIn, LogOut, ArrowUpCircle, ArrowDownCircle,
+  TrendingUp, TrendingDown, Wallet, Printer, CheckCircle2
 } from "lucide-react";
 
 const ActiveCashGame = () => {
@@ -40,6 +41,10 @@ const ActiveCashGame = () => {
   const [closePlayerOpen, setClosePlayerOpen] = useState(false);
   const [closeTargetId, setCloseTargetId] = useState("");
   const [finalChips, setFinalChips] = useState("");
+
+  // Player financial summary dialog (after closing)
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  const [summaryPlayer, setSummaryPlayer] = useState<(DBCashPlayer & { player?: DBPlayer }) | null>(null);
 
   // End session summary dialog
   const [endSessionOpen, setEndSessionOpen] = useState(false);
@@ -198,6 +203,15 @@ const ActiveCashGame = () => {
       toast({ title: "Jogador fechado!", description: `Resultado: R$ ${result >= 0 ? "+" : ""}${result.toFixed(2)}` });
       setClosePlayerOpen(false);
       setFinalChips("");
+      setSummaryPlayer({
+        ...cp,
+        finalChips: chips,
+        result,
+        isActive: false,
+        closedAt: new Date().toISOString(),
+        currentChips: chips,
+      });
+      setSummaryOpen(true);
       load();
     } catch (error) {
       console.error("Erro:", error);
@@ -576,7 +590,12 @@ const ActiveCashGame = () => {
               Adicionar Jogador
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div
+            className="space-y-4"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") { e.preventDefault(); handleAddPlayer(); }
+            }}
+          >
             <div className="space-y-2">
               <Label>Jogador</Label>
               <Select value={selectedPlayerId} onValueChange={setSelectedPlayerId}>
@@ -599,7 +618,6 @@ const ActiveCashGame = () => {
                 type="number"
                 value={initialBuyin}
                 onChange={(e) => setInitialBuyin(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddPlayer(); } }}
                 placeholder="100"
                 className="bg-muted border-border"
               />
@@ -674,7 +692,138 @@ const ActiveCashGame = () => {
         </DialogContent>
       </Dialog>
 
-      {/* New Player Modal */}
+      {/* Player Financial Summary Dialog */}
+      <Dialog open={summaryOpen} onOpenChange={setSummaryOpen}>
+        <DialogContent className="bg-card border-border max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-poker-gold flex items-center gap-2">
+              <Wallet className="w-5 h-5" />
+              Resumo Financeiro
+            </DialogTitle>
+          </DialogHeader>
+          {summaryPlayer && (() => {
+            const result = summaryPlayer.result ?? 0;
+            const positive = result >= 0;
+            const playerTxs = transactions
+              .filter(t => t.cashPlayerId === summaryPlayer.id)
+              .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+            const minutes = summaryPlayer.closedAt
+              ? Math.floor((new Date(summaryPlayer.closedAt).getTime() - new Date(summaryPlayer.joinedAt).getTime()) / 60000)
+              : 0;
+            const timePlayed = `${Math.floor(minutes / 60)}h${(minutes % 60).toString().padStart(2, "0")}m`;
+            const paymentLabel = summaryPlayer.paymentStatus === "paid" ? "Pago" : summaryPlayer.paymentStatus === "received" ? "Recebido" : "Pendente";
+
+            return (
+              <div className="space-y-4">
+                {/* Player header */}
+                <div className="text-center">
+                  <p className="text-lg font-bold">{summaryPlayer.player?.name ?? "Jogador"}</p>
+                  {summaryPlayer.player?.nickname && (
+                    <p className="text-xs text-muted-foreground">"{summaryPlayer.player.nickname}"</p>
+                  )}
+                  <p className="text-[11px] text-muted-foreground mt-1">{session.name} • {session.blinds}</p>
+                </div>
+
+                {/* Result highlight */}
+                <div className={`rounded-lg p-4 text-center ${positive ? "bg-primary/10 border border-primary/30" : "bg-destructive/10 border border-destructive/30"}`}>
+                  <div className="flex items-center justify-center gap-2">
+                    {positive ? <TrendingUp className="w-5 h-5 text-primary" /> : <TrendingDown className="w-5 h-5 text-destructive" />}
+                    <span className="text-xs text-muted-foreground">{positive ? "Lucro" : "Prejuízo"}</span>
+                  </div>
+                  <p className={`text-2xl font-bold font-display ${positive ? "text-primary" : "text-destructive"}`}>
+                    {positive ? "+" : ""}R$ {result.toFixed(2)}
+                  </p>
+                </div>
+
+                {/* Financial breakdown */}
+                <div className="bg-muted rounded-lg p-3 space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Buy-in inicial</span>
+                    <span className="font-semibold">R$ {summaryPlayer.initialBuyin.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Total investido</span>
+                    <span className="font-bold text-secondary">R$ {summaryPlayer.totalInvested.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Fichas finais</span>
+                    <span className="font-bold">R$ {(summaryPlayer.finalChips ?? 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-border pt-2">
+                    <span className="text-muted-foreground">Tempo jogado</span>
+                    <span>{timePlayed}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Entrada</span>
+                    <span>{formatTime(summaryPlayer.joinedAt)}{summaryPlayer.closedAt ? ` • Saída ${formatTime(summaryPlayer.closedAt)}` : ""}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Pagamento</span>
+                    <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> {paymentLabel}</span>
+                  </div>
+                </div>
+
+                {/* Transaction history */}
+                {playerTxs.length > 0 && (
+                  <div className="bg-muted/50 rounded-lg p-2 space-y-1 max-h-40 overflow-y-auto">
+                    <p className="text-[10px] font-semibold text-muted-foreground mb-1">Movimentações</p>
+                    {playerTxs.map(tx => {
+                      const Icon = txIconMap[tx.type] ?? Clock;
+                      return (
+                        <div key={tx.id} className="flex items-center gap-2 text-xs">
+                          <span className="text-[10px] text-muted-foreground w-12 shrink-0 font-mono">{formatTime(tx.timestamp)}</span>
+                          <Icon className="w-3 h-3 shrink-0 text-muted-foreground" />
+                          <span className="flex-1">{txLabelMap[tx.type] ?? tx.type}</span>
+                          <span className="font-bold">R$ {tx.amount.toFixed(2)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setSummaryOpen(false)}>Fechar</Button>
+                  <Button
+                    className="glow-green"
+                    onClick={() => {
+                      const w = window.open("", "_blank", "width=400,height=560");
+                      if (!w) return;
+                      w.document.write(`
+                        <html><head><title>Resumo - ${summaryPlayer.player?.name ?? "Jogador"}</title><style>
+                          body { font-family: monospace; padding: 20px; max-width: 350px; margin: 0 auto; }
+                          h2 { text-align: center; border-bottom: 2px dashed #333; padding-bottom: 10px; }
+                          .row { display: flex; justify-content: space-between; padding: 4px 0; }
+                          .result { font-size: 1.3em; font-weight: bold; text-align: center; margin: 16px 0; }
+                          .footer { text-align: center; margin-top: 20px; font-size: 0.8em; color: #666; border-top: 2px dashed #333; padding-top: 10px; }
+                          .positive { color: green; } .negative { color: red; }
+                        </style></head><body>
+                          <h2>🃏 Cash Game Pro</h2>
+                          <p style="text-align:center;font-size:0.85em;">${session.name} • ${session.blinds}</p>
+                          <div class="row"><span>Jogador:</span><span><b>${summaryPlayer.player?.name ?? "Jogador"}</b></span></div>
+                          <div class="row"><span>Buy-in inicial:</span><span>R$ ${summaryPlayer.initialBuyin.toFixed(2)}</span></div>
+                          <div class="row"><span>Total investido:</span><span>R$ ${summaryPlayer.totalInvested.toFixed(2)}</span></div>
+                          <div class="row"><span>Fichas finais:</span><span>R$ ${(summaryPlayer.finalChips ?? 0).toFixed(2)}</span></div>
+                          <div class="row"><span>Tempo jogado:</span><span>${timePlayed}</span></div>
+                          <div class="row"><span>Pagamento:</span><span>${paymentLabel}</span></div>
+                          <div class="result ${positive ? "positive" : "negative"}">
+                            Resultado: R$ ${positive ? "+" : ""}${result.toFixed(2)}
+                          </div>
+                          <div class="footer"><p>Cash Game Pro</p><p>Documento gerado automaticamente</p></div>
+                          <script>setTimeout(() => window.print(), 300);</script>
+                        </body></html>
+                      `);
+                      w.document.close();
+                    }}
+                  >
+                    <Printer className="w-4 h-4 mr-1" /> Imprimir
+                  </Button>
+                </DialogFooter>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
       <PlayerModal
         open={newPlayerModalOpen}
         onOpenChange={setNewPlayerModalOpen}
