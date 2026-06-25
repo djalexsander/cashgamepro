@@ -111,26 +111,45 @@ const ActiveCashGame = () => {
       `<div class="row"><span>${formatTime(tx.timestamp)} ${escapeHtml(txLabelMap[tx.type] ?? tx.type)}</span><strong>R$ ${tx.amount.toFixed(2)}</strong></div>`
     ).join("");
     return `
-      <!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Resumo - ${escapeHtml(sp.player?.name ?? "Jogador")}</title><style>
-        @page { size: auto; margin: 4mm; }
-        * { box-sizing: border-box; }
-        html, body { margin: 0; padding: 0; background: #fff; color: #111; }
-        body { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; width: 100%; padding: 4mm; font-size: 12px; line-height: 1.35; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        .receipt { width: 72mm; max-width: 100%; margin: 0 auto; overflow: visible; }
-        h2 { text-align: center; border-bottom: 1px dashed #333; padding: 0 0 8px; margin: 0 0 6px; font-size: 16px; }
-        p { margin: 4px 0; }
-        .row { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; break-inside: avoid; page-break-inside: avoid; }
+      <!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=80mm, initial-scale=1" /><title>Recibo - ${escapeHtml(sp.player?.name ?? "Jogador")}</title><style>
+        @page { size: 80mm auto; margin: 0; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body {
+          width: 80mm;
+          margin: 0;
+          padding: 0;
+          background: #fff;
+          color: #000;
+          overflow: hidden;
+        }
+        body {
+          font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+          font-size: 12px;
+          line-height: 1.35;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        .receipt { width: 80mm; margin: 0 auto; padding: 4mm 3mm; }
+        h2 { text-align: center; border-bottom: 1px dashed #333; padding: 0 0 6px; margin: 0 0 6px; font-size: 15px; }
+        p { margin: 3px 0; }
+        .center { text-align: center; }
+        .row { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; }
         .row span:first-child { flex: 1 1 auto; overflow-wrap: anywhere; }
         .row span:last-child, .row strong { flex: 0 0 auto; text-align: right; white-space: nowrap; }
-        .result { font-size: 1.18em; font-weight: bold; text-align: center; margin: 12px 0; padding: 8px 0; border-top: 1px dashed #999; border-bottom: 1px dashed #999; break-inside: avoid; page-break-inside: avoid; }
-        .footer { text-align: center; margin-top: 12px; font-size: 0.82em; color: #555; border-top: 1px dashed #333; padding-top: 8px; break-inside: avoid; page-break-inside: avoid; }
-        .sub { border-top: 1px dashed #999; margin-top: 8px; padding-top: 6px; }
+        .result { font-size: 1.15em; font-weight: bold; text-align: center; margin: 10px 0; padding: 6px 0; border-top: 1px dashed #999; border-bottom: 1px dashed #999; }
+        .footer { text-align: center; margin-top: 10px; font-size: 0.82em; color: #333; border-top: 1px dashed #333; padding-top: 6px; }
+        .footer p:last-child { margin-bottom: 0; }
+        .sub { border-top: 1px dashed #999; margin-top: 6px; padding-top: 4px; }
         .positive { color: #047857; } .negative { color: #dc2626; }
-        @media print { body { width: auto; } .receipt { margin: 0; } }
+        @media print {
+          @page { size: 80mm auto; margin: 0; }
+          html, body { width: 80mm; margin: 0; padding: 0; overflow: hidden; }
+          .receipt { width: 80mm; }
+        }
       </style></head><body>
         <main class="receipt">
         <h2>Cash Game Pro</h2>
-        <p style="text-align:center;font-size:0.9em;">${escapeHtml(session.name)} • ${escapeHtml(session.blinds)}</p>
+        <p class="center" style="font-size:0.9em;">${escapeHtml(session.name)} • ${escapeHtml(session.blinds)}</p>
         <div class="row"><span>Jogador:</span><strong>${escapeHtml(sp.player?.name ?? "Jogador")}</strong></div>
         <div class="row"><span>Buy-in inicial:</span><span>R$ ${sp.initialBuyin.toFixed(2)}</span></div>
         <div class="row"><span>Total investido:</span><span>R$ ${sp.totalInvested.toFixed(2)}</span></div>
