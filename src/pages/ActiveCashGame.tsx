@@ -179,7 +179,7 @@ const ActiveCashGame = () => {
     iframe.style.left = "-10000px";
     iframe.style.top = "0";
     iframe.style.width = "80mm";
-    iframe.style.height = "100vh";
+    iframe.style.height = "0";
     iframe.style.border = "0";
     iframe.setAttribute("aria-hidden", "true");
     document.body.appendChild(iframe);
@@ -199,25 +199,14 @@ const ActiveCashGame = () => {
     const win = iframe.contentWindow;
     if (!doc || !win) { cleanup(); return; }
 
-    const prepareReceiptSize = () => {
-      const receipt = doc.querySelector(".receipt") as HTMLElement | null;
-      const heightPx = Math.max(
-        doc.body?.scrollHeight ?? 0,
-        doc.documentElement?.scrollHeight ?? 0,
-        receipt?.scrollHeight ?? 0,
-      );
-      const heightMm = Math.max(80, Math.ceil(heightPx * 0.264583) + 16);
-      const pageStyle = doc.createElement("style");
-      pageStyle.textContent = `@page { size: 80mm ${heightMm}mm; margin: 4mm; }`;
-      doc.head.appendChild(pageStyle);
-      iframe.style.height = `${heightPx + 80}px`;
-    };
-
+    // The printed coupon height is driven entirely by `@page { size: 80mm auto }`
+    // in the receipt HTML, so the paper is cut right after the last line. We do
+    // NOT inject a fixed page height here — that was the cause of the
+    // meters-long blank coupon on the POS-80.
     const triggerPrint = () => {
       if (printed || cleaned) return;
       printed = true;
       try {
-        prepareReceiptSize();
         win.focus();
         win.print();
       } finally {
