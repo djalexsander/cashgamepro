@@ -199,14 +199,27 @@ const ActiveCashGame = () => {
     const win = iframe.contentWindow;
     if (!doc || !win) { cleanup(); return; }
 
-    // The printed coupon height is driven entirely by `@page { size: 80mm auto }`
-    // in the receipt HTML, so the paper is cut right after the last line. We do
-    // NOT inject a fixed page height here — that was the cause of the
-    // meters-long blank coupon on the POS-80.
+    // Chromium ignores `@page { size: 80mm auto }` (it falls back to Letter and
+    // feeds ~280mm of blank paper). To cut the coupon right after the last line
+    // we measure ONLY the receipt element and inject a fixed `@page` height.
+    // (The old bug measured documentElement.scrollHeight, which equals the tall
+    // iframe viewport, producing meters of paper.)
+    const prepareReceiptSize = () => {
+      const receipt = doc.querySelector(".receipt") as HTMLElement | null;
+      if (!receipt) return;
+      const heightPx = receipt.getBoundingClientRect().height;
+      // px -> mm at 96dpi, plus a tiny 2mm safety so nothing is clipped.
+      const heightMm = Math.max(40, Math.ceil(heightPx * 25.4 / 96) + 2);
+      const pageStyle = doc.createElement("style");
+      pageStyle.textContent = `@page { size: 80mm ${heightMm}mm; margin: 0; }`;
+      doc.head.appendChild(pageStyle);
+    };
+
     const triggerPrint = () => {
       if (printed || cleaned) return;
       printed = true;
       try {
+        prepareReceiptSize();
         win.focus();
         win.print();
       } finally {
