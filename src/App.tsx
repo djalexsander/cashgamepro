@@ -26,13 +26,27 @@ const queryClient = new QueryClient();
 const AppContent = () => {
   useEffect(() => {
     const handler = (event: PromiseRejectionEvent) => {
-      console.error("Unhandled rejection:", event.reason);
-      toast({ title: "Erro inesperado", description: "Algo deu errado. Tente novamente.", variant: "destructive" });
+      console.error("[app] unhandled rejection", event.reason);
+      toast({
+        title: "Falha inesperada no app",
+        description:
+          event.reason instanceof Error
+            ? event.reason.message
+            : "Veja o console para o detalhe técnico do erro.",
+        variant: "destructive",
+      });
       event.preventDefault();
     };
     const errorHandler = (event: ErrorEvent) => {
-      console.error("Unhandled error:", event.error);
-      toast({ title: "Erro inesperado", description: "Algo deu errado. Verifique o console.", variant: "destructive" });
+      console.error("[app] unhandled error", event.error);
+      toast({
+        title: "Falha inesperada no app",
+        description:
+          event.error instanceof Error
+            ? event.error.message
+            : "Veja o console para o detalhe técnico do erro.",
+        variant: "destructive",
+      });
     };
     window.addEventListener("unhandledrejection", handler);
     window.addEventListener("error", errorHandler);

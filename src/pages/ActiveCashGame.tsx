@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { db, generateId, type DBCashSession, type DBCashPlayer, type DBPlayer, type DBTransaction, type PaymentMethod } from "@/db/database";
 import { toast } from "@/hooks/use-toast";
+import { printThermalReceipt } from "@/utils/thermalReceiptPrint";
 import PlayerModal from "@/components/PlayerModal";
 import {
   ArrowLeft, Plus, Users, DollarSign, Clock, Spade,
@@ -112,39 +113,60 @@ const ActiveCashGame = () => {
     ).join("");
     return `
       <!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=80mm, initial-scale=1" /><title>Recibo - ${escapeHtml(sp.player?.name ?? "Jogador")}</title><style>
-        @page { size: 80mm auto; margin: 0; }
+        @page { size: 80mm 40mm; margin: 0; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html, body {
-          width: 80mm;
-          margin: 0;
-          padding: 0;
+          margin: 0 !important;
+          padding: 0 !important;
+          width: 80mm !important;
+          min-height: 0 !important;
+          height: auto !important;
+          overflow: hidden !important;
           background: #fff;
           color: #000;
-          overflow: hidden;
         }
         body {
+          display: block !important;
+          align-items: initial !important;
+          justify-content: initial !important;
           font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
           font-size: 12px;
           line-height: 1.35;
           -webkit-print-color-adjust: exact;
           print-color-adjust: exact;
         }
-        .receipt { width: 80mm; margin: 0 auto; padding: 4mm 3mm; }
+        .receipt {
+          width: 74mm !important;
+          margin: 0 auto !important;
+          padding: 2mm 3mm !important;
+          transform: none !important;
+          position: static !important;
+          top: auto !important;
+        }
         h2 { text-align: center; border-bottom: 1px dashed #333; padding: 0 0 6px; margin: 0 0 6px; font-size: 15px; }
         p { margin: 3px 0; }
         .center { text-align: center; }
-        .row { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; }
-        .row span:first-child { flex: 1 1 auto; overflow-wrap: anywhere; }
-        .row span:last-child, .row strong { flex: 0 0 auto; text-align: right; white-space: nowrap; }
+        .row { display: grid; grid-template-columns: 1fr auto; column-gap: 8px; padding: 2px 0; }
+        .row span:first-child { overflow-wrap: anywhere; }
+        .row span:last-child, .row strong { text-align: right; white-space: nowrap; }
         .result { font-size: 1.15em; font-weight: bold; text-align: center; margin: 10px 0; padding: 6px 0; border-top: 1px dashed #999; border-bottom: 1px dashed #999; }
         .footer { text-align: center; margin-top: 10px; font-size: 0.82em; color: #333; border-top: 1px dashed #333; padding-top: 6px; }
         .footer p:last-child { margin-bottom: 0; }
         .sub { border-top: 1px dashed #999; margin-top: 6px; padding-top: 4px; }
         .positive { color: #047857; } .negative { color: #dc2626; }
         @media print {
-          @page { size: 80mm auto; margin: 0; }
-          html, body { width: 80mm; margin: 0; padding: 0; overflow: hidden; }
-          .receipt { width: 80mm; }
+          @page { size: 80mm 40mm; margin: 0; }
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            height: auto !important;
+            min-height: 0 !important;
+          }
+          body { display: block !important; }
+          .receipt {
+            page-break-after: avoid !important;
+            break-after: avoid !important;
+          }
         }
       </style></head><body>
         <main class="receipt">
@@ -166,110 +188,47 @@ const ActiveCashGame = () => {
     `;
   };
 
-  // Print using a hidden iframe — works inside PWA/standalone and avoids
-  // the infinite-print loop that happens when printing the React document.
-  const printSummary = (sp: (DBCashPlayer & { player?: DBPlayer }) | null) => {
-    if (!sp || !session) return;
-    if (printInProgressRef.current) return;
+  // Print through an isolated thermal root in the main window.
+  const printSummary = async (sp: (DBCashPlayer & { player?: DBPlayer }) | null) => {
+    console.log("[receipt-print] printSummary start");
+
+    if (!sp || !session) {
+      toast({
+        title: "Recibo indisponível",
+        description: "Não há dados suficientes para imprimir este recibo.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (printInProgressRef.current) {
+      toast({
+        title: "Impressão em andamento",
+        description: "Aguarde a impressão atual terminar antes de tentar novamente.",
+      });
+      return;
+    }
+
     printInProgressRef.current = true;
 
-    const html = buildSummaryHtml(sp);
-    const iframe = document.createElement("iframe");
-    iframe.style.position = "fixed";
-    iframe.style.left = "-10000px";
-    iframe.style.top = "0";
-    iframe.style.width = "80mm";
-    iframe.style.height = "0";
-    iframe.style.border = "0";
-    iframe.setAttribute("aria-hidden", "true");
-    document.body.appendChild(iframe);
-
-    let cleaned = false;
-    let printed = false;
-    const cleanup = () => {
-      if (cleaned) return;
-      cleaned = true;
-      setTimeout(() => {
-        if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-        printInProgressRef.current = false;
-      }, 2500);
-    };
-
-    const doc = iframe.contentWindow?.document;
-    const win = iframe.contentWindow;
-    if (!doc || !win) { cleanup(); return; }
-
-    // Chromium ignores `@page { size: 80mm auto }` (it falls back to Letter and
-    // feeds ~280mm of blank paper). To cut the coupon right after the last line
-    // we measure ONLY the receipt element and inject a fixed `@page` height.
-    // (The old bug measured documentElement.scrollHeight, which equals the tall
-    // iframe viewport, producing meters of paper.)
-    const prepareReceiptSize = () => {
-      const receipt = doc.querySelector(".receipt") as HTMLElement | null;
-      if (!receipt) return;
-      const heightPx = receipt.getBoundingClientRect().height;
-      // px -> mm at 96dpi, plus a tiny 2mm safety so nothing is clipped.
-      const heightMm = Math.max(40, Math.ceil(heightPx * 25.4 / 96) + 2);
-      const pageStyle = doc.createElement("style");
-      pageStyle.textContent = `@page { size: 80mm ${heightMm}mm; margin: 0; }`;
-      doc.head.appendChild(pageStyle);
-    };
-
-    const triggerPrint = () => {
-      if (printed || cleaned) return;
-      printed = true;
-
-      try {
-        prepareReceiptSize();
-        win.focus();
-
-        try {
-          win.print();
-        } catch (error) {
-          console.error("[printSummary] Falha ao imprimir no Tauri/WebView:", error);
-
-          toast({
-            title: "Falha na impressão",
-            description:
-              "O Desktop/Tauri bloqueou a impressão automática. Verifique o console para mais detalhes.",
-            variant: "destructive",
-          });
-
-          cleanup();
-          return;
-        }
-      } catch (error) {
-        console.error("[printSummary] Erro ao preparar impressão:", error);
-
-        toast({
-          title: "Erro inesperado",
-          description: "Não foi possível preparar o recibo para impressão.",
-          variant: "destructive",
-        });
-
-        cleanup();
-        return;
-      }
-
-      setTimeout(cleanup, 30000);
-    };
-
-    const onMessage = (event: MessageEvent) => {
-      if (event.source !== win || event.data !== "cash-game-pro-print-ready") return;
-      window.removeEventListener("message", onMessage);
-      setTimeout(triggerPrint, 100);
-    };
-
-    win.onafterprint = cleanup;
-    window.addEventListener("message", onMessage);
-    doc.open();
-    doc.write(html.replace("</body>", `<script>window.onload=function(){parent.postMessage('cash-game-pro-print-ready','*')};<\/script></body>`));
-    doc.close();
-
-    setTimeout(() => {
-      window.removeEventListener("message", onMessage);
-      triggerPrint();
-    }, 1000);
+    try {
+      await printThermalReceipt({
+        html: buildSummaryHtml(sp),
+        logPrefix: "[receipt-print]",
+      });
+    } catch (error) {
+      console.error("[receipt-print] error", error);
+      toast({
+        title: "Falha ao imprimir recibo",
+        description:
+          error instanceof Error
+            ? error.message
+            : "O Desktop/Tauri ou o navegador recusou a chamada de impressão.",
+        variant: "destructive",
+      });
+    } finally {
+      printInProgressRef.current = false;
+    }
   };
 
   // F10 keyboard shortcut to print the open financial summary
@@ -277,7 +236,7 @@ const ActiveCashGame = () => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "F10" && !e.repeat && summaryOpen && summaryPlayer) {
         e.preventDefault();
-        printSummary(summaryPlayer);
+        void printSummary(summaryPlayer);
       }
     };
     window.addEventListener("keydown", handler);
@@ -898,6 +857,9 @@ const ActiveCashGame = () => {
               <Wallet className="w-5 h-5" />
               Resumo Financeiro
             </DialogTitle>
+            <DialogDescription>
+              Recibo financeiro do jogador fechado nesta sessão.
+            </DialogDescription>
           </DialogHeader>
           {summaryPlayer && (() => {
             const result = summaryPlayer.result ?? 0;
@@ -982,10 +944,16 @@ const ActiveCashGame = () => {
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setSummaryOpen(false)}>Fechar</Button>
                   <Button
+                    type="button"
                     className="glow-green"
-                    onClick={() => printSummary(summaryPlayer)}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      console.log("[receipt-print] button clicked");
+                      void printSummary(summaryPlayer);
+                    }}
                   >
-                    <Printer className="w-4 h-4 mr-1" /> Imprimir <span className="ml-1 text-[10px] opacity-70">(F10)</span>
+                    <Printer className="w-4 h-4 mr-1" /> Imprimir Recibo <span className="ml-1 text-[10px] opacity-70">(F10)</span>
                   </Button>
                 </DialogFooter>
 

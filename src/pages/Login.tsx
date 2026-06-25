@@ -58,8 +58,16 @@ const Login = () => {
           navigate("/", { replace: true });
         }, 500);
       }
-    } catch {
-      toast({ title: "Erro inesperado", variant: "destructive" });
+    } catch (error) {
+      console.error("[login] error", error);
+      toast({
+        title: isSignUp ? "Falha ao cadastrar" : "Falha ao entrar",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Não foi possível concluir a autenticação.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -82,8 +90,16 @@ const Login = () => {
         setResetSent(true);
         toast({ title: "Email enviado!", description: "Verifique sua caixa de entrada." });
       }
-    } catch {
-      toast({ title: "Erro inesperado", variant: "destructive" });
+    } catch (error) {
+      console.error("[password-reset] error", error);
+      toast({
+        title: "Falha ao enviar recuperação",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Não foi possível enviar o email de recuperação.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }

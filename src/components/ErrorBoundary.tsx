@@ -43,7 +43,7 @@ class ErrorBoundary extends Component<Props, State> {
             <div className="w-16 h-16 mx-auto rounded-full bg-destructive/20 flex items-center justify-center">
               <span className="text-3xl">⚠️</span>
             </div>
-            <h1 className="text-xl font-bold text-foreground">Algo deu errado</h1>
+            <h1 className="text-xl font-bold text-foreground">Falha ao renderizar a tela</h1>
             <p className="text-sm text-muted-foreground">
               Ocorreu um erro inesperado na aplicação. Tente recarregar a página.
             </p>
@@ -52,7 +52,7 @@ class ErrorBoundary extends Component<Props, State> {
                 onClick={this.handleReload}
                 className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
               >
-                Recarregar Página
+                Recarregar p�gina
               </button>
               <button
                 onClick={this.handleReset}

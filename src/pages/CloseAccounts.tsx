@@ -4,19 +4,28 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
   AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 import { db, generateId, type DBCashSession, type DBCashPlayer, type DBPlayer, type DBTransaction, type PaymentMethod, type PaymentStatus } from "@/db/database";
 import { toast } from "@/hooks/use-toast";
+import { printThermalReceipt } from "@/utils/thermalReceiptPrint";
 import {
   DollarSign, Users, TrendingUp, TrendingDown, Lock,
   AlertTriangle, Printer, Clock, Wallet, CheckCircle2, MinusCircle,
 } from "lucide-react";
 
 type EnrichedCashPlayer = DBCashPlayer & { player?: DBPlayer; session?: DBCashSession };
+type ReceiptData = {
+  name: string;
+  invested: number;
+  finalChips: number;
+  result: number;
+  date: string;
+  session: string;
+};
 
 const CloseAccounts = () => {
   const [activeSessions, setActiveSessions] = useState<DBCashSession[]>([]);
@@ -35,9 +44,7 @@ const CloseAccounts = () => {
 
   // Receipt
   const [receiptOpen, setReceiptOpen] = useState(false);
-  const [receiptData, setReceiptData] = useState<{
-    name: string; invested: number; finalChips: number; result: number; date: string; session: string;
-  } | null>(null);
+  const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -90,6 +97,13 @@ const CloseAccounts = () => {
   const activeCount = cashPlayers.filter(cp => cp.isActive).length;
   const rakePartial = totalInvested - totalReturned - cashPlayers.filter(cp => cp.isActive).reduce((sum, cp) => sum + cp.currentChips, 0);
 
+  const escapeHtml = (value: string) => value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
   const openCloseModal = (cp: EnrichedCashPlayer) => {
     if (!cp.isActive) {
       toast({ title: "Atenção", description: "Este jogador já foi fechado.", variant: "destructive" });
@@ -115,7 +129,15 @@ const CloseAccounts = () => {
   };
 
   const handleConfirmClose = async () => {
-    if (!closeTarget) return;
+    console.log("[close-account] confirm start");
+    if (!closeTarget) {
+      toast({
+        title: "Conta não selecionada",
+        description: "Selecione um jogador antes de confirmar o fechamento.",
+        variant: "destructive",
+      });
+      return;
+    }
     const chips = parseFloat(finalChips);
 
     try {
@@ -131,6 +153,7 @@ const CloseAccounts = () => {
         paymentMethod: closePaymentMethod,
         paymentStatus: closePaymentStatus,
       });
+      console.log("[close-account] updated player");
 
       // Update player permanent stats
       if (result >= 0) {
@@ -160,56 +183,138 @@ const CloseAccounts = () => {
         description: `${closeTarget.player?.name ?? "Jogador"}: R$ ${result >= 0 ? "+" : ""}${result.toFixed(2)}`,
       });
 
-      // Prepare receipt data
-      setReceiptData({
+      const nextReceiptData: ReceiptData = {
         name: closeTarget.player?.name ?? "Jogador",
         invested: closeTarget.totalInvested,
         finalChips: chips,
         result,
         date: new Date().toLocaleString("pt-BR"),
         session: closeTarget.session?.name ?? "",
-      });
+      };
+
+      setReceiptData(nextReceiptData);
 
       setConfirmOpen(false);
       setCloseOpen(false);
       setReceiptOpen(true);
+      console.log("[close-account] summary opened");
       load();
     } catch (error) {
-      console.error("Erro ao fechar conta:", error);
-      toast({ title: "Erro", description: "Falha ao fechar conta.", variant: "destructive" });
+      console.error("[close-account] error", error);
+      toast({
+        title: "Falha ao fechar conta",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Não foi possível concluir o fechamento da conta.",
+        variant: "destructive",
+      });
     }
   };
 
-  const handlePrintReceipt = () => {
-    if (!receiptData) return;
-    const w = window.open("", "_blank", "width=400,height=500");
-    if (!w) return;
-    w.document.write(`
-      <html><head><title>Recibo</title><style>
-        body { font-family: monospace; padding: 20px; max-width: 350px; margin: 0 auto; }
-        h2 { text-align: center; border-bottom: 2px dashed #333; padding-bottom: 10px; }
-        .row { display: flex; justify-content: space-between; padding: 4px 0; }
-        .result { font-size: 1.3em; font-weight: bold; text-align: center; margin: 16px 0; }
-        .footer { text-align: center; margin-top: 20px; font-size: 0.8em; color: #666; border-top: 2px dashed #333; padding-top: 10px; }
-        .positive { color: green; } .negative { color: red; }
+  const buildReceiptHtml = (data: ReceiptData | null = receiptData) => {
+    if (!data) return "";
+
+    return `
+      <!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=80mm, initial-scale=1" /><title>Recibo</title><style>
+        @page { size: 80mm 40mm; margin: 0; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body {
+          margin: 0 !important;
+          padding: 0 !important;
+          width: 80mm !important;
+          min-height: 0 !important;
+          height: auto !important;
+          overflow: hidden !important;
+          background: #fff;
+          color: #000;
+        }
+        body {
+          display: block !important;
+          align-items: initial !important;
+          justify-content: initial !important;
+          font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+          font-size: 12px;
+          line-height: 1.35;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        .receipt {
+          width: 74mm !important;
+          margin: 0 auto !important;
+          padding: 2mm 3mm !important;
+          transform: none !important;
+          position: static !important;
+          top: auto !important;
+        }
+        h2 { text-align: center; border-bottom: 1px dashed #333; padding: 0 0 6px; margin: 0 0 6px; font-size: 15px; }
+        p { margin: 3px 0; }
+        .center { text-align: center; }
+        .row { display: grid; grid-template-columns: 1fr auto; column-gap: 8px; padding: 2px 0; }
+        .row span:first-child { overflow-wrap: anywhere; }
+        .row span:last-child, .row strong { text-align: right; white-space: nowrap; }
+        .result { font-size: 1.15em; font-weight: bold; text-align: center; margin: 10px 0; padding: 6px 0; border-top: 1px dashed #999; border-bottom: 1px dashed #999; }
+        .footer { text-align: center; margin-top: 10px; font-size: 0.82em; color: #333; border-top: 1px dashed #333; padding-top: 6px; }
+        .footer p:last-child { margin-bottom: 0; }
+        .positive { color: #047857; } .negative { color: #dc2626; }
+        @media print {
+          @page { size: 80mm 40mm; margin: 0; }
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            height: auto !important;
+            min-height: 0 !important;
+          }
+          body { display: block !important; }
+          .receipt {
+            page-break-after: avoid !important;
+            break-after: avoid !important;
+          }
+        }
       </style></head><body>
-        <h2>🃏 Cash Game Pro</h2>
-        <p style="text-align:center;font-size:0.85em;">${receiptData.session}</p>
-        <div class="row"><span>Jogador:</span><span><b>${receiptData.name}</b></span></div>
-        <div class="row"><span>Investido:</span><span>R$ ${receiptData.invested.toFixed(2)}</span></div>
-        <div class="row"><span>Fichas Finais:</span><span>R$ ${receiptData.finalChips.toFixed(2)}</span></div>
-        <div class="result ${receiptData.result >= 0 ? "positive" : "negative"}">
-          Resultado: R$ ${receiptData.result >= 0 ? "+" : ""}${receiptData.result.toFixed(2)}
+        <main class="receipt">
+        <h2>Cash Game Pro</h2>
+        <p class="center" style="font-size:0.9em;">${escapeHtml(data.session)}</p>
+        <div class="row"><span>Jogador:</span><strong>${escapeHtml(data.name)}</strong></div>
+        <div class="row"><span>Investido:</span><span>R$ ${data.invested.toFixed(2)}</span></div>
+        <div class="row"><span>Fichas Finais:</span><span>R$ ${data.finalChips.toFixed(2)}</span></div>
+        <div class="result ${data.result >= 0 ? "positive" : "negative"}">
+          Resultado: R$ ${data.result >= 0 ? "+" : ""}${data.result.toFixed(2)}
         </div>
-        <div class="row"><span>Data:</span><span>${receiptData.date}</span></div>
-        <div class="footer">
-          <p>Cash Game Pro</p>
-          <p>Documento gerado automaticamente</p>
-        </div>
-        <script>setTimeout(() => window.print(), 300);</script>
+        <div class="row"><span>Data:</span><span>${escapeHtml(data.date)}</span></div>
+        <div class="footer"><p>Cash Game Pro</p><p>Documento gerado automaticamente</p></div>
+        </main>
       </body></html>
-    `);
-    w.document.close();
+    `;
+  };
+
+  const handlePrintReceipt = async () => {
+    console.log("[receipt-print] button clicked");
+    console.log("[receipt-print] printSummary start");
+
+    const html = buildReceiptHtml();
+    if (!html) {
+      toast({
+        title: "N�o h� dados para imprimir.",
+        description: "Feche uma conta antes de imprimir o recibo.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await printThermalReceipt({ html, logPrefix: "[receipt-print]" });
+    } catch (error) {
+      console.error("[receipt-print] error", error);
+      toast({
+        title: "Falha ao imprimir recibo",
+        description:
+          error instanceof Error
+            ? error.message
+            : "O Desktop/Tauri ou o navegador recusou a chamada de impressão.",
+        variant: "destructive",
+      });
+    }
   };
 
   // Time played helper
@@ -508,6 +613,9 @@ const CloseAccounts = () => {
               <Printer className="w-5 h-5" />
               Recibo
             </DialogTitle>
+            <DialogDescription>
+              Recibo térmico 80mm da conta fechada.
+            </DialogDescription>
           </DialogHeader>
           {receiptData && (
             <div className="space-y-3 text-sm">
@@ -525,7 +633,7 @@ const CloseAccounts = () => {
                 <div className="border-t border-dashed border-border my-2" />
                 <p className="text-center text-[10px] text-muted-foreground">{receiptData.date}</p>
               </div>
-              <Button onClick={handlePrintReceipt} className="w-full gap-2">
+              <Button type="button" onClick={() => void handlePrintReceipt()} className="w-full gap-2">
                 <Printer className="w-4 h-4" />
                 Imprimir Recibo
               </Button>
