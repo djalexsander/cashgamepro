@@ -218,13 +218,40 @@ const ActiveCashGame = () => {
     const triggerPrint = () => {
       if (printed || cleaned) return;
       printed = true;
+
       try {
         prepareReceiptSize();
         win.focus();
-        win.print();
-      } finally {
-        setTimeout(cleanup, 30000);
+
+        try {
+          win.print();
+        } catch (error) {
+          console.error("[printSummary] Falha ao imprimir no Tauri/WebView:", error);
+
+          toast({
+            title: "Falha na impressão",
+            description:
+              "O Desktop/Tauri bloqueou a impressão automática. Verifique o console para mais detalhes.",
+            variant: "destructive",
+          });
+
+          cleanup();
+          return;
+        }
+      } catch (error) {
+        console.error("[printSummary] Erro ao preparar impressão:", error);
+
+        toast({
+          title: "Erro inesperado",
+          description: "Não foi possível preparar o recibo para impressão.",
+          variant: "destructive",
+        });
+
+        cleanup();
+        return;
       }
+
+      setTimeout(cleanup, 30000);
     };
 
     const onMessage = (event: MessageEvent) => {
