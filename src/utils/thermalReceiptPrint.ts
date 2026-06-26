@@ -1,9 +1,13 @@
+import { toast } from "@/hooks/use-toast";
+
 type ThermalPrintOptions = {
   html: string;
   logPrefix?: string;
 };
 
 const PRINT_ROOT_ID = "thermal-print-root";
+const PRINTING_CLASS = "thermal-printing";
+let hasShownHeaderFooterHint = false;
 
 const waitForPrintLayout = () =>
   new Promise<void>((resolve) => {
@@ -12,9 +16,13 @@ const waitForPrintLayout = () =>
     });
   });
 
+const removeExistingPrintStyles = () => {
+  document.querySelectorAll("style[data-thermal-print-style]").forEach((node) => node.remove());
+};
+
 const removeExistingPrintNodes = () => {
   document.getElementById(PRINT_ROOT_ID)?.remove();
-  document.querySelectorAll("[data-thermal-print-style]").forEach((node) => node.remove());
+  removeExistingPrintStyles();
 };
 
 const createPrintStyle = (heightMm?: number) => {
@@ -135,21 +143,26 @@ const createPrintStyle = (heightMm?: number) => {
     }
 
     @media print {
-      @page {
-        size: 80mm ${heightMm ? `${heightMm}mm` : "auto"};
-        margin: 0;
+      ${
+        heightMm
+          ? `@page {
+        size: 80mm ${heightMm}mm;
+        margin: 0 !important;
+      }`
+          : ""
       }
 
-      html, body {
+      html.${PRINTING_CLASS},
+      html.${PRINTING_CLASS} body {
         margin: 0 !important;
         padding: 0 !important;
         width: 80mm !important;
         min-height: 0 !important;
         height: auto !important;
-        overflow: visible !important;
+        overflow: hidden !important;
       }
 
-      body > *:not(#${PRINT_ROOT_ID}) {
+      html.${PRINTING_CLASS} body > *:not(#${PRINT_ROOT_ID}) {
         display: none !important;
       }
 
@@ -160,11 +173,12 @@ const createPrintStyle = (heightMm?: number) => {
 
       #${PRINT_ROOT_ID} {
         display: block !important;
-        position: absolute !important;
+        position: fixed !important;
         left: 0 !important;
         top: 0 !important;
         bottom: auto !important;
         width: 80mm !important;
+        height: auto !important;
         margin: 0 !important;
         padding: 0 !important;
         opacity: 1 !important;
@@ -172,6 +186,11 @@ const createPrintStyle = (heightMm?: number) => {
       }
 
       #${PRINT_ROOT_ID} .receipt {
+        position: relative !important;
+        top: 0 !important;
+        width: 74mm !important;
+        margin: 0 auto !important;
+        padding: 2mm 3mm !important;
         page-break-after: avoid !important;
         break-after: avoid !important;
       }
@@ -180,13 +199,18 @@ const createPrintStyle = (heightMm?: number) => {
   return style;
 };
 
+const appendPrintStyle = (heightMm?: number) => {
+  removeExistingPrintStyles();
+  document.head.appendChild(createPrintStyle(heightMm));
+};
+
 const buildPrintRoot = (html: string) => {
   const parser = new DOMParser();
   const printDoc = parser.parseFromString(html, "text/html");
   const receipt = printDoc.querySelector(".receipt");
 
   if (!receipt) {
-    throw new Error("Elemento .receipt não encontrado no HTML de impressão.");
+    throw new Error("Elemento .receipt nao encontrado no HTML de impressao.");
   }
 
   const root = document.createElement("div");
@@ -206,12 +230,16 @@ const buildPrintRoot = (html: string) => {
   return { root };
 };
 
-const getReceiptHeightMm = (root: HTMLElement) => {
+const getReceipt = (root: HTMLElement) => {
   const receipt = root.querySelector(".receipt") as HTMLElement | null;
   if (!receipt) {
-    throw new Error("Elemento .receipt não encontrado no root de impressão.");
+    throw new Error("Elemento .receipt nao encontrado no root de impressao.");
   }
 
+  return receipt;
+};
+
+const getReceiptHeightMm = (receipt: HTMLElement) => {
   const rect = receipt.getBoundingClientRect();
   const heightPx = Math.ceil(rect.height);
   const heightMm = Math.max(40, Math.ceil((heightPx * 25.4) / 96) + 4);
@@ -222,18 +250,57 @@ const getReceiptHeightMm = (root: HTMLElement) => {
   return heightMm;
 };
 
+const logPrintMetrics = (root: HTMLElement, receipt: HTMLElement, heightMm: number) => {
+  console.table({
+    bodyScrollHeight: document.body.scrollHeight,
+    bodyOffsetHeight: document.body.offsetHeight,
+    htmlScrollHeight: document.documentElement.scrollHeight,
+    htmlOffsetHeight: document.documentElement.offsetHeight,
+    receiptHeight: receipt.offsetHeight,
+    receiptScrollHeight: receipt.scrollHeight,
+    rootHeight: root.offsetHeight,
+    heightMm,
+  });
+
+  console.log(
+    "[thermal-print] computed body",
+    getComputedStyle(document.body).height,
+    getComputedStyle(document.body).display,
+  );
+  console.log(
+    "[thermal-print] computed html",
+    getComputedStyle(document.documentElement).height,
+    getComputedStyle(document.documentElement).display,
+  );
+  console.log(
+    "[thermal-print] computed root",
+    getComputedStyle(root).height,
+    getComputedStyle(root).display,
+    getComputedStyle(root).position,
+  );
+  console.log(
+    "[thermal-print] computed receipt",
+    getComputedStyle(receipt).height,
+    getComputedStyle(receipt).display,
+    getComputedStyle(receipt).position,
+  );
+};
+
 export const printThermalReceipt = async ({ html }: ThermalPrintOptions) => {
   console.log("[thermal-print] start");
   console.log("[thermal-print] using main-window print root");
 
   let cleaned = false;
   let cleanupTimer: number | undefined;
+  const previousTitle = document.title;
 
   const cleanup = () => {
     if (cleaned) return;
     cleaned = true;
     if (cleanupTimer) window.clearTimeout(cleanupTimer);
     window.removeEventListener("afterprint", cleanup);
+    document.documentElement.classList.remove(PRINTING_CLASS);
+    document.title = previousTitle;
     removeExistingPrintNodes();
     console.log("[thermal-print] after cleanup");
   };
@@ -242,14 +309,16 @@ export const printThermalReceipt = async ({ html }: ThermalPrintOptions) => {
     removeExistingPrintNodes();
     const { root } = buildPrintRoot(html);
 
-    document.head.appendChild(createPrintStyle());
     document.body.appendChild(root);
+    appendPrintStyle();
+    document.documentElement.classList.add(PRINTING_CLASS);
     window.scrollTo(0, 0);
 
     await waitForPrintLayout();
 
-    const heightMm = getReceiptHeightMm(root);
-    document.head.appendChild(createPrintStyle(heightMm));
+    const receipt = getReceipt(root);
+    const heightMm = getReceiptHeightMm(receipt);
+    appendPrintStyle(heightMm);
 
     await waitForPrintLayout();
 
@@ -257,6 +326,15 @@ export const printThermalReceipt = async ({ html }: ThermalPrintOptions) => {
     cleanupTimer = window.setTimeout(cleanup, 30000);
 
     console.log("[thermal-print] before window.print");
+    logPrintMetrics(root, receipt, heightMm);
+    if (!hasShownHeaderFooterHint) {
+      hasShownHeaderFooterHint = true;
+      toast({
+        title: "Impressao POS-80",
+        description: "Em Mais configuracoes, desative Cabecalhos e rodapes.",
+      });
+    }
+    document.title = "";
     window.focus();
     window.print();
   } catch (error) {

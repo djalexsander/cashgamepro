@@ -26,7 +26,11 @@ const queryClient = new QueryClient();
 const AppContent = () => {
   useEffect(() => {
     const handler = (event: PromiseRejectionEvent) => {
-      console.error("[app] unhandled rejection", event.reason);
+      console.error("[app] unhandled rejection", {
+        reason: event.reason,
+        message: event.reason instanceof Error ? event.reason.message : String(event.reason),
+        stack: event.reason instanceof Error ? event.reason.stack : undefined,
+      });
       toast({
         title: "Falha inesperada no app",
         description:
@@ -38,7 +42,14 @@ const AppContent = () => {
       event.preventDefault();
     };
     const errorHandler = (event: ErrorEvent) => {
-      console.error("[app] unhandled error", event.error);
+      console.error("[app] unhandled error", {
+        error: event.error,
+        message: event.message,
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+        stack: event.error instanceof Error ? event.error.stack : undefined,
+      });
       toast({
         title: "Falha inesperada no app",
         description:

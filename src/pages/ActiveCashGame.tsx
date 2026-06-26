@@ -112,63 +112,7 @@ const ActiveCashGame = () => {
       `<div class="row"><span>${formatTime(tx.timestamp)} ${escapeHtml(txLabelMap[tx.type] ?? tx.type)}</span><strong>R$ ${tx.amount.toFixed(2)}</strong></div>`
     ).join("");
     return `
-      <!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=80mm, initial-scale=1" /><title>Recibo - ${escapeHtml(sp.player?.name ?? "Jogador")}</title><style>
-        @page { size: 80mm 40mm; margin: 0; }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body {
-          margin: 0 !important;
-          padding: 0 !important;
-          width: 80mm !important;
-          min-height: 0 !important;
-          height: auto !important;
-          overflow: hidden !important;
-          background: #fff;
-          color: #000;
-        }
-        body {
-          display: block !important;
-          align-items: initial !important;
-          justify-content: initial !important;
-          font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-          font-size: 12px;
-          line-height: 1.35;
-          -webkit-print-color-adjust: exact;
-          print-color-adjust: exact;
-        }
-        .receipt {
-          width: 74mm !important;
-          margin: 0 auto !important;
-          padding: 2mm 3mm !important;
-          transform: none !important;
-          position: static !important;
-          top: auto !important;
-        }
-        h2 { text-align: center; border-bottom: 1px dashed #333; padding: 0 0 6px; margin: 0 0 6px; font-size: 15px; }
-        p { margin: 3px 0; }
-        .center { text-align: center; }
-        .row { display: grid; grid-template-columns: 1fr auto; column-gap: 8px; padding: 2px 0; }
-        .row span:first-child { overflow-wrap: anywhere; }
-        .row span:last-child, .row strong { text-align: right; white-space: nowrap; }
-        .result { font-size: 1.15em; font-weight: bold; text-align: center; margin: 10px 0; padding: 6px 0; border-top: 1px dashed #999; border-bottom: 1px dashed #999; }
-        .footer { text-align: center; margin-top: 10px; font-size: 0.82em; color: #333; border-top: 1px dashed #333; padding-top: 6px; }
-        .footer p:last-child { margin-bottom: 0; }
-        .sub { border-top: 1px dashed #999; margin-top: 6px; padding-top: 4px; }
-        .positive { color: #047857; } .negative { color: #dc2626; }
-        @media print {
-          @page { size: 80mm 40mm; margin: 0; }
-          html, body {
-            margin: 0 !important;
-            padding: 0 !important;
-            height: auto !important;
-            min-height: 0 !important;
-          }
-          body { display: block !important; }
-          .receipt {
-            page-break-after: avoid !important;
-            break-after: avoid !important;
-          }
-        }
-      </style></head><body>
+      <!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=80mm, initial-scale=1" /><title>Recibo - ${escapeHtml(sp.player?.name ?? "Jogador")}</title></head><body>
         <main class="receipt">
         <h2>Cash Game Pro</h2>
         <p class="center" style="font-size:0.9em;">${escapeHtml(session.name)} • ${escapeHtml(session.blinds)}</p>
@@ -371,7 +315,7 @@ const ActiveCashGame = () => {
       setSummaryOpen(true);
       load();
     } catch (error) {
-      console.error("Erro:", error);
+      console.error("[close-account] error", error);
       toast({ title: "Erro", description: "Falha ao fechar jogador.", variant: "destructive" });
     }
   };
