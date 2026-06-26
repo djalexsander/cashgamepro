@@ -286,6 +286,46 @@ const logPrintMetrics = (root: HTMLElement, receipt: HTMLElement, heightMm: numb
   );
 };
 
+const clampPrintDocument = (root: HTMLElement, heightMm: number) => {
+  const height = `${heightMm}mm`;
+
+  document.documentElement.style.setProperty("width", "80mm", "important");
+  document.documentElement.style.setProperty("height", height, "important");
+  document.documentElement.style.setProperty("min-height", "0", "important");
+  document.documentElement.style.setProperty("max-height", height, "important");
+  document.documentElement.style.setProperty("margin", "0", "important");
+  document.documentElement.style.setProperty("padding", "0", "important");
+  document.documentElement.style.setProperty("overflow", "hidden", "important");
+
+  document.body.style.setProperty("width", "80mm", "important");
+  document.body.style.setProperty("height", height, "important");
+  document.body.style.setProperty("min-height", "0", "important");
+  document.body.style.setProperty("max-height", height, "important");
+  document.body.style.setProperty("margin", "0", "important");
+  document.body.style.setProperty("padding", "0", "important");
+  document.body.style.setProperty("overflow", "hidden", "important");
+
+  root.style.setProperty("position", "absolute", "important");
+  root.style.setProperty("left", "0", "important");
+  root.style.setProperty("top", "0", "important");
+  root.style.setProperty("width", "80mm", "important");
+  root.style.setProperty("height", height, "important");
+  root.style.setProperty("max-height", height, "important");
+  root.style.setProperty("overflow", "hidden", "important");
+};
+
+const logPrintMetricsAfterClamp = (root: HTMLElement, receipt: HTMLElement, heightMm: number) => {
+  console.table({
+    bodyScrollHeightAfterClamp: document.body.scrollHeight,
+    htmlScrollHeightAfterClamp: document.documentElement.scrollHeight,
+    bodyOffsetHeightAfterClamp: document.body.offsetHeight,
+    htmlOffsetHeightAfterClamp: document.documentElement.offsetHeight,
+    rootHeightAfterClamp: root.offsetHeight,
+    receiptHeightAfterClamp: receipt.offsetHeight,
+    heightMm,
+  });
+};
+
 export const printThermalReceipt = async ({ html }: ThermalPrintOptions) => {
   console.log("[thermal-print] start");
   console.log("[thermal-print] using main-window print root");
@@ -293,6 +333,8 @@ export const printThermalReceipt = async ({ html }: ThermalPrintOptions) => {
   let cleaned = false;
   let cleanupTimer: number | undefined;
   const previousTitle = document.title;
+  const previousHtmlStyle = document.documentElement.getAttribute("style");
+  const previousBodyStyle = document.body.getAttribute("style");
 
   const cleanup = () => {
     if (cleaned) return;
@@ -301,6 +343,10 @@ export const printThermalReceipt = async ({ html }: ThermalPrintOptions) => {
     window.removeEventListener("afterprint", cleanup);
     document.documentElement.classList.remove(PRINTING_CLASS);
     document.title = previousTitle;
+    if (previousHtmlStyle === null) document.documentElement.removeAttribute("style");
+    else document.documentElement.setAttribute("style", previousHtmlStyle);
+    if (previousBodyStyle === null) document.body.removeAttribute("style");
+    else document.body.setAttribute("style", previousBodyStyle);
     removeExistingPrintNodes();
     console.log("[thermal-print] after cleanup");
   };
@@ -327,6 +373,12 @@ export const printThermalReceipt = async ({ html }: ThermalPrintOptions) => {
 
     console.log("[thermal-print] before window.print");
     logPrintMetrics(root, receipt, heightMm);
+    clampPrintDocument(root, heightMm);
+
+    await waitForPrintLayout();
+
+    console.log("[thermal-print] after clamp");
+    logPrintMetricsAfterClamp(root, receipt, heightMm);
     if (!hasShownHeaderFooterHint) {
       hasShownHeaderFooterHint = true;
       toast({
