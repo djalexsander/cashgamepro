@@ -6,10 +6,12 @@ type ThermalPrintOptions = {
 };
 
 const PRINT_FRAME_ID = "thermal-print-frame";
+const PRINT_ROOT_ID = "thermal-print-root";
+const PRINTING_CLASS = "thermal-printing";
 const MIN_RECEIPT_HEIGHT_MM = 40;
 const PRINT_CLEANUP_TIMEOUT_MS = 15000;
+const DESKTOP_PRINT_CLEANUP_TIMEOUT_MS = 120000;
 
-let hasShownHeaderFooterHint = false;
 let printInProgress = false;
 
 const waitForPrintLayout = (targetWindow: Window = window) =>
@@ -23,6 +25,11 @@ const removeExistingPrintFrame = () => {
   document.getElementById(PRINT_FRAME_ID)?.remove();
 };
 
+const removeExistingMainPrintNodes = () => {
+  document.getElementById(PRINT_ROOT_ID)?.remove();
+  document.querySelectorAll("style[data-thermal-print-style]").forEach((node) => node.remove());
+};
+
 const parseReceipt = (html: string) => {
   const parser = new DOMParser();
   const printDoc = parser.parseFromString(html, "text/html");
@@ -33,6 +40,13 @@ const parseReceipt = (html: string) => {
   }
 
   return receipt.outerHTML;
+};
+
+const isTauriDesktop = () => "__TAURI_INTERNALS__" in window;
+
+const openSystemPrintDialog = async () => {
+  const { invoke } = await import("@tauri-apps/api/core");
+  await invoke("open_system_print_dialog");
 };
 
 const createPrintFrame = () => {
@@ -59,6 +73,26 @@ const createPrintFrame = () => {
   }
 
   return iframe;
+};
+
+const createMainPrintRoot = (receiptHtml: string) => {
+  removeExistingMainPrintNodes();
+
+  const root = document.createElement("div");
+  root.id = PRINT_ROOT_ID;
+  root.style.position = "fixed";
+  root.style.left = "0";
+  root.style.top = "0";
+  root.style.width = "80mm";
+  root.style.margin = "0";
+  root.style.padding = "0";
+  root.style.opacity = "0";
+  root.style.pointerEvents = "none";
+  root.style.zIndex = "-1";
+  root.innerHTML = receiptHtml;
+  document.body.appendChild(root);
+
+  return root;
 };
 
 const createReceiptStyles = (heightMm?: number) => `
@@ -186,6 +220,72 @@ const createReceiptStyles = (heightMm?: number) => `
   }
 `;
 
+const createMainReceiptStyles = (heightMm: number) => `
+  ${createReceiptStyles(heightMm)}
+
+  @media screen {
+    #${PRINT_ROOT_ID} {
+      position: fixed !important;
+      left: 0 !important;
+      top: 0 !important;
+      width: 80mm !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+      z-index: -1 !important;
+    }
+  }
+
+  @media print {
+    html.${PRINTING_CLASS},
+    html.${PRINTING_CLASS} body {
+      width: 80mm !important;
+      min-width: 80mm !important;
+      max-width: 80mm !important;
+      height: ${heightMm}mm !important;
+      min-height: 0 !important;
+      max-height: ${heightMm}mm !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+    }
+
+    html.${PRINTING_CLASS} body > *:not(#${PRINT_ROOT_ID}) {
+      display: none !important;
+    }
+
+    #${PRINT_ROOT_ID} {
+      display: block !important;
+      position: absolute !important;
+      left: 0 !important;
+      top: 0 !important;
+      width: 80mm !important;
+      height: ${heightMm}mm !important;
+      max-height: ${heightMm}mm !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+      pointer-events: none !important;
+      transform: none !important;
+    }
+
+    #${PRINT_ROOT_ID} .receipt {
+      margin: 0 auto !important;
+    }
+  }
+`;
+
+const appendMainPrintStyle = (heightMm: number) => {
+  document.querySelectorAll("style[data-thermal-print-style]").forEach((node) => node.remove());
+  const style = document.createElement("style");
+  style.setAttribute("data-thermal-print-style", "true");
+  style.textContent = createMainReceiptStyles(heightMm);
+  document.head.appendChild(style);
+};
+
 const writeFrameDocument = (printDocument: Document, receiptHtml: string, heightMm?: number) => {
   printDocument.open();
   printDocument.write(`
@@ -209,14 +309,53 @@ const getReceiptHeightMm = (receipt: HTMLElement) => {
   return Math.max(MIN_RECEIPT_HEIGHT_MM, Math.ceil((heightPx * 25.4) / 96) + 6);
 };
 
-export const printThermalReceipt = async ({ html, logPrefix = "[thermal-print]" }: ThermalPrintOptions) => {
-  if (printInProgress) {
-    throw new Error("Ja existe uma impressao em andamento. Aguarde concluir para tentar novamente.");
+const printReceiptWithSystemDialog = async (receiptHtml: string, logPrefix: string) => {
+  let cleaned = false;
+  let cleanupTimer: number | undefined;
+  const previousTitle = document.title;
+
+  const cleanup = () => {
+    if (cleaned) return;
+    cleaned = true;
+    if (cleanupTimer) window.clearTimeout(cleanupTimer);
+    window.removeEventListener("afterprint", cleanup);
+    document.documentElement.classList.remove(PRINTING_CLASS);
+    document.title = previousTitle;
+    removeExistingMainPrintNodes();
+    console.log(`${logPrefix} desktop cleanup`);
+  };
+
+  try {
+    const root = createMainPrintRoot(receiptHtml);
+    await waitForPrintLayout();
+    await document.fonts?.ready;
+
+    const receipt = root.querySelector(".receipt") as HTMLElement | null;
+    if (!receipt) {
+      throw new Error("Elemento .receipt nao encontrado na area de impressao.");
+    }
+
+    const heightMm = getReceiptHeightMm(receipt);
+    console.log(`${logPrefix} receipt height mm`, heightMm);
+
+    appendMainPrintStyle(heightMm);
+    document.documentElement.classList.add(PRINTING_CLASS);
+    document.title = "";
+    window.scrollTo(0, 0);
+
+    await waitForPrintLayout();
+
+    window.addEventListener("afterprint", cleanup, { once: true });
+    cleanupTimer = window.setTimeout(cleanup, DESKTOP_PRINT_CLEANUP_TIMEOUT_MS);
+    window.focus();
+    await openSystemPrintDialog();
+  } catch (error) {
+    cleanup();
+    throw error;
   }
+};
 
-  printInProgress = true;
-  console.log(`${logPrefix} start`);
-
+const printReceiptWithBrowserPreview = async (receiptHtml: string, logPrefix: string) => {
   let iframe: HTMLIFrameElement | null = null;
   let cleaned = false;
   let cleanupTimer: number | undefined;
@@ -224,15 +363,13 @@ export const printThermalReceipt = async ({ html, logPrefix = "[thermal-print]" 
   const cleanup = () => {
     if (cleaned) return;
     cleaned = true;
-    printInProgress = false;
     if (cleanupTimer) window.clearTimeout(cleanupTimer);
     iframe?.contentWindow?.removeEventListener("afterprint", cleanup);
     iframe?.remove();
-    console.log(`${logPrefix} cleanup`);
+    console.log(`${logPrefix} browser cleanup`);
   };
 
   try {
-    const receiptHtml = parseReceipt(html);
     iframe = createPrintFrame();
     const printWindow = iframe.contentWindow;
     const printDocument = iframe.contentDocument;
@@ -257,21 +394,39 @@ export const printThermalReceipt = async ({ html, logPrefix = "[thermal-print]" 
     await waitForPrintLayout(printWindow);
     await printDocument.fonts?.ready;
 
-    if (!hasShownHeaderFooterHint) {
-      hasShownHeaderFooterHint = true;
-      toast({
-        title: "Impressao POS-80",
-        description: "Em Mais configuracoes, desative Cabecalhos e rodapes.",
-      });
-    }
-
     printWindow.addEventListener("afterprint", cleanup, { once: true });
     cleanupTimer = window.setTimeout(cleanup, PRINT_CLEANUP_TIMEOUT_MS);
     printWindow.focus();
     printWindow.print();
   } catch (error) {
-    console.error(`${logPrefix} error`, error);
     cleanup();
     throw error;
+  }
+};
+
+export const printThermalReceipt = async ({ html, logPrefix = "[thermal-print]" }: ThermalPrintOptions) => {
+  if (printInProgress) {
+    throw new Error("Ja existe uma impressao em andamento. Aguarde concluir para tentar novamente.");
+  }
+
+  printInProgress = true;
+  console.log(`${logPrefix} start`);
+
+  try {
+    const receiptHtml = parseReceipt(html);
+    if (isTauriDesktop()) {
+      await printReceiptWithSystemDialog(receiptHtml, logPrefix);
+    } else {
+      toast({
+        title: "Impressao POS-80",
+        description: "Em Mais configuracoes, desative Cabecalhos e rodapes.",
+      });
+      await printReceiptWithBrowserPreview(receiptHtml, logPrefix);
+    }
+  } catch (error) {
+    console.error(`${logPrefix} error`, error);
+    throw error;
+  } finally {
+    printInProgress = false;
   }
 };
