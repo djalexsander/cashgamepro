@@ -12,6 +12,7 @@ import NewCashGame from "./pages/NewCashGame";
 import ActiveCashGame from "./pages/ActiveCashGame";
 import CloseAccounts from "./pages/CloseAccounts";
 import ManageUsers from "./pages/ManageUsers";
+import Settings from "./pages/Settings";
 import Login from "./pages/Login";
 import HomePokerGuide from "./pages/HomePokerGuide";
 import NotFound from "./pages/NotFound";
@@ -85,6 +86,7 @@ const AppContent = () => {
         <Route path="/close-accounts" element={<CloseAccounts />} />
         <Route path="/players" element={<Players />} />
         <Route path="/history" element={<HistoryPage />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="/manage-users" element={<ManageUsers />} />
       </Route>
       <Route path="*" element={<NotFound />} />
