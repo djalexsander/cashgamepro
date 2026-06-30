@@ -4,7 +4,45 @@ import { toast } from "@/hooks/use-toast";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const PWAUpdatePrompt = () => {
+declare global {
+  interface Window {
+    __TAURI__?: unknown;
+    __TAURI_INTERNALS__?: unknown;
+  }
+}
+
+const isTauriDesktop = () =>
+  Boolean(
+    import.meta.env.TAURI ||
+      window.__TAURI__ ||
+      window.__TAURI_INTERNALS__ ||
+      window.location.protocol === "tauri:" ||
+      window.location.hostname === "tauri.localhost",
+  );
+
+const cleanupDesktopServiceWorker = async () => {
+  if ("serviceWorker" in navigator) {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map((registration) => registration.unregister()));
+  }
+
+  if ("caches" in window) {
+    const cacheNames = await caches.keys();
+    await Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName)));
+  }
+};
+
+const DesktopServiceWorkerCleanup = () => {
+  useEffect(() => {
+    cleanupDesktopServiceWorker().catch((error) => {
+      console.warn("[pwa] desktop service worker cleanup failed", error);
+    });
+  }, []);
+
+  return null;
+};
+
+const WebPWAUpdatePrompt = () => {
   const [showBanner, setShowBanner] = useState(false);
 
   const {
@@ -59,6 +97,14 @@ const PWAUpdatePrompt = () => {
       </Button>
     </div>
   );
+};
+
+const PWAUpdatePrompt = () => {
+  if (isTauriDesktop()) {
+    return <DesktopServiceWorkerCleanup />;
+  }
+
+  return <WebPWAUpdatePrompt />;
 };
 
 export default PWAUpdatePrompt;
