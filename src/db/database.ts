@@ -3,9 +3,14 @@ import { supabase } from "@/integrations/supabase/client";
 // Types matching the old interface (camelCase)
 export type GameType = "texas" | "omaha" | "omaha_hilo" | "5card" | "dealers_choice" | "other";
 export type SessionStatus = "active" | "closed";
-export type PaymentMethod = "cash" | "pix" | "pending";
+export type PaymentMethod = "cash" | "pix" | "credit" | "debit" | "fiado" | "pending";
+export type FinancialPaymentMethod = "cash" | "pix" | "credit" | "debit" | "fiado";
+export type ReceivablePaymentMethod = Exclude<FinancialPaymentMethod, "fiado">;
 export type PaymentStatus = "paid" | "pending" | "received";
 export type TransactionType = "buyin" | "rebuy" | "addon" | "withdrawal" | "cashout";
+export type FinancialTransactionType = "buyin" | "rebuy" | "addon" | "settlement" | "fiado_payment" | "manual_adjustment";
+export type ReceivableStatus = "open" | "paid";
+export type ExpenseCategory = "dealer" | "food" | "drinks" | "staff" | "cleaning" | "rent" | "other";
 
 export interface DBPlayer {
   id: string;
@@ -36,6 +41,7 @@ export interface DBCashSession {
   totalInvested?: number;
   totalReturned?: number;
   rakeFinal?: number;
+  dealerPercentage: number;
 }
 
 export interface DBCashPlayer {
@@ -62,6 +68,59 @@ export interface DBTransaction {
   amount: number;
   timestamp: string;
   notes?: string;
+}
+
+export interface DBFinancialTransaction {
+  id: string;
+  sessionId: string;
+  playerId?: string;
+  receivableId?: string;
+  amount: number;
+  paymentMethod: FinancialPaymentMethod;
+  type: FinancialTransactionType;
+  notes?: string;
+  occurredAt: string;
+  createdAt?: string;
+}
+
+export interface DBReceivable {
+  id: string;
+  sessionId: string;
+  playerId: string;
+  sourceTransactionId?: string;
+  originalAmount: number;
+  paidAmount: number;
+  status: ReceivableStatus;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DBSessionExpense {
+  id: string;
+  sessionId: string;
+  category: ExpenseCategory;
+  description: string;
+  amount: number;
+  occurredAt: string;
+  createdAt?: string;
+}
+
+export interface SessionFinanceSummary {
+  receivedTotal: number;
+  cash: number;
+  pix: number;
+  credit: number;
+  debit: number;
+  fiado: number;
+  totalReceivable: number;
+  expenses: number;
+  rakeGross: number;
+  dealerPercentage: number;
+  dealerPayment: number;
+  houseRakeNet: number;
+  netResult: number;
+  fiadoReceived: number;
 }
 
 // Helper: get current user id
@@ -105,6 +164,7 @@ function sessionFromDb(row: any): DBCashSession {
     totalInvested: row.total_invested != null ? Number(row.total_invested) : undefined,
     totalReturned: row.total_returned != null ? Number(row.total_returned) : undefined,
     rakeFinal: row.rake_final != null ? Number(row.rake_final) : undefined,
+    dealerPercentage: row.dealer_percentage != null ? Number(row.dealer_percentage) : 0,
   };
 }
 function sessionToDb(s: DBCashSession, userId: string) {
@@ -115,6 +175,7 @@ function sessionToDb(s: DBCashSession, userId: string) {
     started_at: s.startedAt, ended_at: s.endedAt || null,
     total_invested: s.totalInvested ?? null, total_returned: s.totalReturned ?? null,
     rake_final: s.rakeFinal ?? null,
+    dealer_percentage: s.dealerPercentage ?? 0,
   };
 }
 
@@ -157,6 +218,56 @@ function txToDb(tx: DBTransaction, userId: string) {
   };
 }
 
+function financialTxFromDb(row: any): DBFinancialTransaction {
+  return {
+    id: row.id, sessionId: row.session_id, playerId: row.player_id || undefined,
+    receivableId: row.receivable_id || undefined, amount: Number(row.amount),
+    paymentMethod: row.payment_method as FinancialPaymentMethod,
+    type: row.type as FinancialTransactionType, notes: row.notes || undefined,
+    occurredAt: row.occurred_at, createdAt: row.created_at || undefined,
+  };
+}
+function financialTxToDb(tx: DBFinancialTransaction, userId: string) {
+  return {
+    id: tx.id, user_id: userId, session_id: tx.sessionId, player_id: tx.playerId || null,
+    receivable_id: tx.receivableId || null, amount: tx.amount, payment_method: tx.paymentMethod,
+    type: tx.type, notes: tx.notes || null, occurred_at: tx.occurredAt, created_at: tx.createdAt || new Date().toISOString(),
+  };
+}
+
+function receivableFromDb(row: any): DBReceivable {
+  return {
+    id: row.id, sessionId: row.session_id, playerId: row.player_id,
+    sourceTransactionId: row.source_transaction_id || undefined,
+    originalAmount: Number(row.original_amount), paidAmount: Number(row.paid_amount),
+    status: row.status as ReceivableStatus, notes: row.notes || undefined,
+    createdAt: row.created_at, updatedAt: row.updated_at,
+  };
+}
+function receivableToDb(item: DBReceivable, userId: string) {
+  return {
+    id: item.id, user_id: userId, session_id: item.sessionId, player_id: item.playerId,
+    source_transaction_id: item.sourceTransactionId || null, original_amount: item.originalAmount,
+    paid_amount: item.paidAmount, status: item.status, notes: item.notes || null,
+    created_at: item.createdAt, updated_at: item.updatedAt,
+  };
+}
+
+function expenseFromDb(row: any): DBSessionExpense {
+  return {
+    id: row.id, sessionId: row.session_id, category: row.category as ExpenseCategory,
+    description: row.description || "", amount: Number(row.amount),
+    occurredAt: row.occurred_at, createdAt: row.created_at || undefined,
+  };
+}
+function expenseToDb(item: DBSessionExpense, userId: string) {
+  return {
+    id: item.id, user_id: userId, session_id: item.sessionId, category: item.category,
+    description: item.description, amount: item.amount, occurred_at: item.occurredAt,
+    created_at: item.createdAt || new Date().toISOString(),
+  };
+}
+
 // camelCase to snake_case field mapping
 const camelToSnake: Record<string, string> = {
   totalInvested: "total_invested", totalReturned: "total_returned", rakeFinal: "rake_final",
@@ -167,9 +278,14 @@ const camelToSnake: Record<string, string> = {
   gameType: "game_type", chipValue: "chip_value", dealersChoiceGames: "dealers_choice_games",
   startedAt: "started_at", sessionId: "session_id", playerId: "player_id",
   cashPlayerId: "cash_player_id", createdAt: "created_at",
+  receivableId: "receivable_id",
+  occurredAt: "occurred_at", sourceTransactionId: "source_transaction_id",
+  originalAmount: "original_amount", paidAmount: "paid_amount",
+  dealerPercentage: "dealer_percentage",
   id: "id", name: "name", nickname: "nickname", phone: "phone", pix: "pix",
   notes: "notes", tags: "tags", blinds: "blinds", status: "status", type: "type",
-  amount: "amount", timestamp: "timestamp", result: "result",
+  amount: "amount", timestamp: "timestamp", result: "result", category: "category",
+  description: "description",
 };
 
 function mapChangesToSnake(changes: Record<string, any>): Record<string, any> {
@@ -303,8 +419,153 @@ export const db = {
   cashSessions: new SupabaseTable<DBCashSession>("cash_sessions", sessionFromDb, sessionToDb),
   cashPlayers: new SupabaseTable<DBCashPlayer>("cash_players", cashPlayerFromDb, cashPlayerToDb),
   transactions: new SupabaseTable<DBTransaction>("transactions", txFromDb, txToDb),
+  financialTransactions: new SupabaseTable<DBFinancialTransaction>("financial_transactions", financialTxFromDb, financialTxToDb),
+  receivables: new SupabaseTable<DBReceivable>("receivables", receivableFromDb, receivableToDb),
+  sessionExpenses: new SupabaseTable<DBSessionExpense>("session_expenses", expenseFromDb, expenseToDb),
 };
 
 export function generateId(): string {
   return crypto.randomUUID();
+}
+
+export function isReceivablePaymentMethod(method: PaymentMethod): method is ReceivablePaymentMethod {
+  return method === "cash" || method === "pix" || method === "credit" || method === "debit";
+}
+
+export async function recordFinancialEntry(input: {
+  sessionId: string;
+  playerId?: string;
+  amount: number;
+  paymentMethod: FinancialPaymentMethod;
+  type: FinancialTransactionType;
+  notes?: string;
+  occurredAt?: string;
+}): Promise<DBFinancialTransaction> {
+  const now = input.occurredAt || new Date().toISOString();
+  const tx: DBFinancialTransaction = {
+    id: generateId(),
+    sessionId: input.sessionId,
+    playerId: input.playerId,
+    amount: input.amount,
+    paymentMethod: input.paymentMethod,
+    type: input.type,
+    notes: input.notes,
+    occurredAt: now,
+  };
+  await db.financialTransactions.add(tx);
+
+  if (input.paymentMethod === "fiado" && input.playerId) {
+    const receivable: DBReceivable = {
+      id: generateId(),
+      sessionId: input.sessionId,
+      playerId: input.playerId,
+      sourceTransactionId: tx.id,
+      originalAmount: input.amount,
+      paidAmount: 0,
+      status: "open",
+      notes: input.notes,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await db.receivables.add(receivable);
+    await db.financialTransactions.update(tx.id, { receivableId: receivable.id });
+    return { ...tx, receivableId: receivable.id };
+  }
+
+  return tx;
+}
+
+export async function payReceivable(input: {
+  receivable: DBReceivable;
+  amount: number;
+  paymentMethod: ReceivablePaymentMethod;
+  notes?: string;
+  occurredAt?: string;
+}): Promise<void> {
+  const now = input.occurredAt || new Date().toISOString();
+  const nextPaid = Math.min(input.receivable.originalAmount, input.receivable.paidAmount + input.amount);
+  const status: ReceivableStatus = nextPaid >= input.receivable.originalAmount ? "paid" : "open";
+
+  await db.receivables.update(input.receivable.id, {
+    paidAmount: nextPaid,
+    status,
+    updatedAt: now,
+  });
+
+  await db.financialTransactions.add({
+    id: generateId(),
+    sessionId: input.receivable.sessionId,
+    playerId: input.receivable.playerId,
+    receivableId: input.receivable.id,
+    amount: input.amount,
+    paymentMethod: input.paymentMethod,
+    type: "fiado_payment",
+    notes: input.notes,
+    occurredAt: now,
+  });
+}
+
+export async function getSessionFinanceSummary(session: DBCashSession): Promise<SessionFinanceSummary> {
+  const [financialTransactions, receivables, expenses] = await Promise.all([
+    db.financialTransactions.where("sessionId").equals(session.id).toArray(),
+    db.receivables.where("sessionId").equals(session.id).toArray(),
+    db.sessionExpenses.where("sessionId").equals(session.id).toArray(),
+  ]);
+
+  const byMethod = (method: FinancialPaymentMethod) =>
+    financialTransactions
+      .filter(tx => tx.paymentMethod === method && tx.type !== "fiado_payment")
+      .reduce((sum, tx) => sum + tx.amount, 0);
+  const fiadoReceived = financialTransactions
+    .filter(tx => tx.type === "fiado_payment")
+    .reduce((sum, tx) => sum + tx.amount, 0);
+  const cashPayments = financialTransactions
+    .filter(tx => tx.paymentMethod === "cash")
+    .reduce((sum, tx) => sum + tx.amount, 0);
+  const pixPayments = financialTransactions
+    .filter(tx => tx.paymentMethod === "pix")
+    .reduce((sum, tx) => sum + tx.amount, 0);
+  const creditPayments = financialTransactions
+    .filter(tx => tx.paymentMethod === "credit")
+    .reduce((sum, tx) => sum + tx.amount, 0);
+  const debitPayments = financialTransactions
+    .filter(tx => tx.paymentMethod === "debit")
+    .reduce((sum, tx) => sum + tx.amount, 0);
+
+  const totalReceivable = receivables
+    .filter(item => item.status === "open")
+    .reduce((sum, item) => sum + (item.originalAmount - item.paidAmount), 0);
+  const expensesTotal = expenses.reduce((sum, item) => sum + item.amount, 0);
+  const rakeGross = Number(session.rakeFinal ?? 0);
+  const dealerPercentage = Number(session.dealerPercentage ?? 0);
+  const dealerPayment = rakeGross * dealerPercentage / 100;
+  const houseRakeNet = rakeGross - dealerPayment;
+
+  return {
+    receivedTotal: cashPayments + pixPayments + creditPayments + debitPayments,
+    cash: cashPayments,
+    pix: pixPayments,
+    credit: creditPayments,
+    debit: debitPayments,
+    fiado: byMethod("fiado"),
+    totalReceivable,
+    expenses: expensesTotal,
+    rakeGross,
+    dealerPercentage,
+    dealerPayment,
+    houseRakeNet,
+    netResult: houseRakeNet - expensesTotal,
+    fiadoReceived,
+  };
+}
+
+export async function deleteSessionFinancialData(sessionId: string): Promise<void> {
+  const [financialTransactions, receivables, expenses] = await Promise.all([
+    db.financialTransactions.where("sessionId").equals(sessionId).toArray(),
+    db.receivables.where("sessionId").equals(sessionId).toArray(),
+    db.sessionExpenses.where("sessionId").equals(sessionId).toArray(),
+  ]);
+  await db.financialTransactions.bulkDelete(financialTransactions.map(item => item.id));
+  await db.receivables.bulkDelete(receivables.map(item => item.id));
+  await db.sessionExpenses.bulkDelete(expenses.map(item => item.id));
 }

@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { Plus, Spade, Play, Clock, Trash2 } from "lucide-react";
-import { db, type DBCashSession } from "@/db/database";
+import { db, deleteSessionFinancialData, type DBCashSession } from "@/db/database";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -110,6 +110,7 @@ const CashGames = () => {
                 const cpIds = cps.map(c => c.id!);
                 const txs = await db.transactions.where("sessionId").equals(sid).toArray();
                 for (const tx of txs) await db.transactions.delete(tx.id);
+                await deleteSessionFinancialData(sid);
                 if (cpIds.length) await db.cashPlayers.bulkDelete(cpIds);
                 await db.cashSessions.delete(sid);
                 setSessions(prev => prev.filter(s => s.id !== sid));

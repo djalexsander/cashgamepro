@@ -6,7 +6,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { db, generateId, type DBCashSession, type DBCashPlayer, type DBPlayer, type DBTransaction, type PaymentMethod } from "@/db/database";
+import {
+  db,
+  generateId,
+  getSessionFinanceSummary,
+  recordFinancialEntry,
+  type DBCashSession,
+  type DBCashPlayer,
+  type DBPlayer,
+  type DBTransaction,
+  type FinancialPaymentMethod,
+  type PaymentMethod,
+  type SessionFinanceSummary,
+} from "@/db/database";
 import { toast } from "@/hooks/use-toast";
 import { printThermalReceipt } from "@/utils/thermalReceiptPrint";
 import PlayerModal from "@/components/PlayerModal";
@@ -24,6 +36,7 @@ const ActiveCashGame = () => {
   const [cashPlayers, setCashPlayers] = useState<(DBCashPlayer & { player?: DBPlayer })[]>([]);
   const [allPlayers, setAllPlayers] = useState<DBPlayer[]>([]);
   const [transactions, setTransactions] = useState<DBTransaction[]>([]);
+  const [financeSummary, setFinanceSummary] = useState<SessionFinanceSummary | null>(null);
 
   // Add player dialog
   const [addPlayerOpen, setAddPlayerOpen] = useState(false);
@@ -36,6 +49,7 @@ const ActiveCashGame = () => {
   const [chipsDialogOpen, setChipsDialogOpen] = useState(false);
   const [chipsAction, setChipsAction] = useState<"add" | "remove" | "rebuy">("add");
   const [chipsAmount, setChipsAmount] = useState("");
+  const [chipsPaymentMethod, setChipsPaymentMethod] = useState<FinancialPaymentMethod>("cash");
   const [chipsTargetId, setChipsTargetId] = useState("");
 
   // Close player dialog
@@ -84,6 +98,7 @@ const ActiveCashGame = () => {
 
       const txs = await db.transactions.where("sessionId").equals(id).toArray();
       setTransactions(txs);
+      setFinanceSummary(await getSessionFinanceSummary(s));
 
       const ap = await db.players.orderBy("name").toArray();
       setAllPlayers(ap);
@@ -210,7 +225,7 @@ const ActiveCashGame = () => {
         totalInvested: amount,
         currentChips: amount,
         paymentMethod,
-        paymentStatus: paymentMethod === "pending" ? "pending" : "paid",
+        paymentStatus: paymentMethod === "pending" || paymentMethod === "fiado" ? "pending" : "paid",
         joinedAt: now,
         isActive: true,
       });
@@ -222,6 +237,15 @@ const ActiveCashGame = () => {
         type: "buyin",
         amount,
         timestamp: now,
+      });
+
+      await recordFinancialEntry({
+        sessionId: id!,
+        playerId: selectedPlayerId,
+        amount,
+        paymentMethod: paymentMethod === "pending" ? "fiado" : paymentMethod as FinancialPaymentMethod,
+        type: "buyin",
+        occurredAt: now,
       });
 
       toast({ title: "Jogador adicionado! ♠", description: `Buy-in de R$ ${amount.toFixed(2)}` });
@@ -265,9 +289,21 @@ const ActiveCashGame = () => {
         type: txType, amount, timestamp: now,
       });
 
+      if (txType === "rebuy" || txType === "addon") {
+        await recordFinancialEntry({
+          sessionId: id!,
+          playerId: cp.playerId,
+          amount,
+          paymentMethod: chipsPaymentMethod,
+          type: txType,
+          occurredAt: now,
+        });
+      }
+
       toast({ title: "Movimentação registrada!", description: `${chipsAction === "remove" ? "Retirada" : chipsAction === "rebuy" ? "Rebuy" : "Add"}: R$ ${amount.toFixed(2)}` });
       setChipsDialogOpen(false);
       setChipsAmount("");
+      setChipsPaymentMethod("cash");
       load();
     } catch (error) {
       console.error("Erro:", error);
@@ -355,6 +391,10 @@ const ActiveCashGame = () => {
   const totalInvested = cashPlayers.reduce((sum, cp) => sum + cp.totalInvested, 0);
   const totalReturned = cashPlayers.filter(cp => !cp.isActive).reduce((sum, cp) => sum + (cp.finalChips ?? 0), 0);
   const rakeFinal = totalInvested - totalReturned;
+  const dealerPayment = rakeFinal * (session?.dealerPercentage ?? 0) / 100;
+  const houseRakeNet = rakeFinal - dealerPayment;
+  const financeExpenses = financeSummary?.expenses ?? 0;
+  const finalNetResult = houseRakeNet - financeExpenses;
   const activePlayers = cashPlayers.filter(cp => cp.isActive);
   const allClosed = activePlayers.length === 0 && cashPlayers.length > 0;
 
@@ -607,7 +647,7 @@ const ActiveCashGame = () => {
                 <p className="text-xl font-bold font-display">{cashPlayers.length}</p>
               </div>
               <div className="bg-muted rounded-lg p-3 text-center">
-                <p className="text-xs text-muted-foreground">Rake da Casa</p>
+                <p className="text-xs text-muted-foreground">Rake Bruto</p>
                 <p className={`text-xl font-bold font-display ${rakeFinal >= 0 ? "text-primary" : "text-destructive"}`}>
                   R$ {rakeFinal.toFixed(2)}
                 </p>
@@ -619,6 +659,46 @@ const ActiveCashGame = () => {
               <div className="bg-muted rounded-lg p-3 text-center">
                 <p className="text-xs text-muted-foreground">Total Devolvido</p>
                 <p className="text-lg font-bold font-display">R$ {totalReturned.toFixed(2)}</p>
+              </div>
+              <div className="bg-muted rounded-lg p-3 text-center">
+                <p className="text-xs text-muted-foreground">Dealer ({(session.dealerPercentage ?? 0).toFixed(2)}%)</p>
+                <p className="text-lg font-bold font-display text-secondary">R$ {dealerPayment.toFixed(2)}</p>
+              </div>
+              <div className="bg-muted rounded-lg p-3 text-center">
+                <p className="text-xs text-muted-foreground">Rake Liquido Casa</p>
+                <p className={`text-lg font-bold font-display ${houseRakeNet >= 0 ? "text-primary" : "text-destructive"}`}>
+                  R$ {houseRakeNet.toFixed(2)}
+                </p>
+              </div>
+              <div className="bg-muted rounded-lg p-3 text-center">
+                <p className="text-xs text-muted-foreground">Dinheiro</p>
+                <p className="text-lg font-bold font-display">R$ {(financeSummary?.cash ?? 0).toFixed(2)}</p>
+              </div>
+              <div className="bg-muted rounded-lg p-3 text-center">
+                <p className="text-xs text-muted-foreground">Pix</p>
+                <p className="text-lg font-bold font-display">R$ {(financeSummary?.pix ?? 0).toFixed(2)}</p>
+              </div>
+              <div className="bg-muted rounded-lg p-3 text-center">
+                <p className="text-xs text-muted-foreground">Credito</p>
+                <p className="text-lg font-bold font-display">R$ {(financeSummary?.credit ?? 0).toFixed(2)}</p>
+              </div>
+              <div className="bg-muted rounded-lg p-3 text-center">
+                <p className="text-xs text-muted-foreground">Debito</p>
+                <p className="text-lg font-bold font-display">R$ {(financeSummary?.debit ?? 0).toFixed(2)}</p>
+              </div>
+              <div className="bg-muted rounded-lg p-3 text-center">
+                <p className="text-xs text-muted-foreground">Fiados Gerados</p>
+                <p className="text-lg font-bold font-display text-secondary">R$ {(financeSummary?.fiado ?? 0).toFixed(2)}</p>
+              </div>
+              <div className="bg-muted rounded-lg p-3 text-center">
+                <p className="text-xs text-muted-foreground">Despesas</p>
+                <p className="text-lg font-bold font-display text-destructive">R$ {financeExpenses.toFixed(2)}</p>
+              </div>
+              <div className="bg-muted rounded-lg p-3 text-center col-span-2">
+                <p className="text-xs text-muted-foreground">Resultado Liquido Final</p>
+                <p className={`text-xl font-bold font-display ${finalNetResult >= 0 ? "text-primary" : "text-destructive"}`}>
+                  R$ {finalNetResult.toFixed(2)}
+                </p>
               </div>
             </div>
 
@@ -732,7 +812,9 @@ const ActiveCashGame = () => {
                 <SelectContent>
                   <SelectItem value="cash">Dinheiro</SelectItem>
                   <SelectItem value="pix">Pix</SelectItem>
-                  <SelectItem value="pending">Pendente</SelectItem>
+                  <SelectItem value="credit">Credito</SelectItem>
+                  <SelectItem value="debit">Debito</SelectItem>
+                  <SelectItem value="fiado">Fiado</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -757,6 +839,23 @@ const ActiveCashGame = () => {
               <Label>Valor (R$)</Label>
               <Input type="number" value={chipsAmount} onChange={(e) => setChipsAmount(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleChipsAction(); } }} placeholder="50" className="bg-muted border-border" />
             </div>
+            {chipsAction !== "remove" && (
+              <div className="space-y-2">
+                <Label>Forma de Pagamento</Label>
+                <Select value={chipsPaymentMethod} onValueChange={(v) => setChipsPaymentMethod(v as FinancialPaymentMethod)}>
+                  <SelectTrigger className="bg-muted border-border">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Dinheiro</SelectItem>
+                    <SelectItem value="pix">Pix</SelectItem>
+                    <SelectItem value="credit">Credito</SelectItem>
+                    <SelectItem value="debit">Debito</SelectItem>
+                    <SelectItem value="fiado">Fiado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setChipsDialogOpen(false)}>Cancelar</Button>

@@ -11,6 +11,7 @@ import HistoryPage from "./pages/HistoryPage";
 import NewCashGame from "./pages/NewCashGame";
 import ActiveCashGame from "./pages/ActiveCashGame";
 import CloseAccounts from "./pages/CloseAccounts";
+import Finance from "./pages/Finance";
 import ManageUsers from "./pages/ManageUsers";
 import Settings from "./pages/Settings";
 import Login from "./pages/Login";
@@ -84,6 +85,7 @@ const AppContent = () => {
         <Route path="/cash-games/new" element={<NewCashGame />} />
         <Route path="/cash-games/:id" element={<ActiveCashGame />} />
         <Route path="/close-accounts" element={<CloseAccounts />} />
+        <Route path="/finance" element={<Finance />} />
         <Route path="/players" element={<Players />} />
         <Route path="/history" element={<HistoryPage />} />
         <Route path="/settings" element={<Settings />} />

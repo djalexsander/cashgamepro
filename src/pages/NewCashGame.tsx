@@ -21,6 +21,7 @@ const NewCashGame = () => {
   const [gameType, setGameType] = useState<GameType | "">("");
   const [blinds, setBlinds] = useState("");
   const [chipValue, setChipValue] = useState("");
+  const [dealerPercentage, setDealerPercentage] = useState("0");
   const [notes, setNotes] = useState("");
   const [dealersChoiceGames, setDealersChoiceGames] = useState("");
   const [gameDate, setGameDate] = useState<Date>(new Date());
@@ -45,6 +46,12 @@ const NewCashGame = () => {
       return;
     }
 
+    const dealerPct = parseFloat(dealerPercentage || "0");
+    if (Number.isNaN(dealerPct) || dealerPct < 0 || dealerPct > 100) {
+      toast({ title: "Percentual invalido", description: "Informe uma porcentagem do dealer entre 0 e 100.", variant: "destructive" });
+      return;
+    }
+
     setSaving(true);
     try {
       const session = {
@@ -55,6 +62,7 @@ const NewCashGame = () => {
         chipValue: parseFloat(chipValue),
         notes: notes.trim() || undefined,
         dealersChoiceGames: gameType === "dealers_choice" ? dealersChoiceGames.trim() || undefined : undefined,
+        dealerPercentage: dealerPct,
         status: "active" as const,
         startedAt: gameDate.toISOString(),
       };
@@ -157,6 +165,19 @@ const NewCashGame = () => {
               <Label>Valor da Ficha (R$) *</Label>
               <Input type="number" value={chipValue} onChange={(e) => setChipValue(e.target.value)} placeholder="1.00" className="bg-muted border-border" />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Porcentagem do dealer sobre o rake (%)</Label>
+            <Input
+              type="number"
+              min="0"
+              max="100"
+              value={dealerPercentage}
+              onChange={(e) => setDealerPercentage(e.target.value)}
+              placeholder="0"
+              className="bg-muted border-border"
+            />
           </div>
 
           <div className="space-y-2">

@@ -10,6 +10,7 @@ import {
   UserCog,
   Users,
   Wallet,
+  WalletCards,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth, useAdmin } from "@/contexts/AuthContext";
@@ -20,6 +21,7 @@ const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/cash-games", icon: Spade, label: "Cash Games" },
   { to: "/close-accounts", icon: Wallet, label: "Fechar" },
+  { to: "/finance", icon: WalletCards, label: "Financeiro" },
   { to: "/players", icon: Users, label: "Jogadores" },
   { to: "/history", icon: History, label: "Historico" },
   { to: "/settings", icon: Settings, label: "Config." },

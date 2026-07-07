@@ -15,9 +15,11 @@ export interface Player {
 
 export type GameType = 'texas' | 'omaha' | 'omaha_hilo' | 'other';
 export type SessionStatus = 'active' | 'closed';
-export type PaymentMethod = 'cash' | 'pix' | 'pending';
+export type PaymentMethod = 'cash' | 'pix' | 'credit' | 'debit' | 'fiado' | 'pending';
+export type FinancialPaymentMethod = 'cash' | 'pix' | 'credit' | 'debit' | 'fiado';
 export type PaymentStatus = 'paid' | 'pending' | 'received';
 export type TransactionType = 'buyin' | 'rebuy' | 'addon' | 'withdrawal' | 'cashout';
+export type FinancialTransactionType = 'buyin' | 'rebuy' | 'addon' | 'settlement' | 'fiado_payment' | 'manual_adjustment';
 
 export interface CashSession {
   id: string;
@@ -27,6 +29,7 @@ export interface CashSession {
   chipValue: number;
   rakePercent: number;
   rakeCap: number;
+  dealerPercentage: number;
   notes?: string;
   status: SessionStatus;
   startedAt: string;

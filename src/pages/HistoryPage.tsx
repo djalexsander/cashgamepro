@@ -13,7 +13,7 @@ import {
   History, DollarSign, Users, Clock, ChevronRight, Filter, CalendarIcon, X,
   TrendingUp, TrendingDown, ArrowUpCircle, ArrowDownCircle, RotateCcw, LogIn, LogOut, Trash2
 } from "lucide-react";
-import { db, type DBCashSession, type DBCashPlayer, type DBPlayer, type DBTransaction } from "@/db/database";
+import { db, deleteSessionFinancialData, type DBCashSession, type DBCashPlayer, type DBPlayer, type DBTransaction } from "@/db/database";
 import Seo from "@/components/Seo";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -136,6 +136,7 @@ const HistoryPage = () => {
     await db.cashPlayers.bulkDelete(cps.map(c => c.id));
     const txs = await db.transactions.where("sessionId").equals(sid).toArray();
     await db.transactions.bulkDelete(txs.map(t => t.id));
+    await deleteSessionFinancialData(sid);
     await db.cashSessions.delete(sid);
     setSessions(prev => prev.filter(s => s.id !== sid));
     toast({ title: "Sessão excluída! 🗑️" });
@@ -179,6 +180,7 @@ const HistoryPage = () => {
                   await db.cashPlayers.bulkDelete(cps.map(c => c.id));
                   const txs = await db.transactions.where("sessionId").equals(sid).toArray();
                   await db.transactions.bulkDelete(txs.map(t => t.id));
+                  await deleteSessionFinancialData(sid);
                 }
                 await db.cashSessions.bulkDelete(closedIds);
                 setSessions([]);
