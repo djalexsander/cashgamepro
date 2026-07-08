@@ -134,15 +134,41 @@ const Finance = () => {
   const load = async () => {
     setLoading(true);
     try {
-      const allSessions = await db.cashSessions.orderBy("startedAt").reverse().toArray();
-      await Promise.all(allSessions.map(session => reconcileSessionFiadoBalances(session.id)));
+      let allSessions: DBCashSession[] = [];
+      try {
+        allSessions = await db.cashSessions.orderBy("startedAt").reverse().toArray();
+        console.log("[Finance] Sessões carregadas:", allSessions.length);
+      } catch (error) {
+        console.error("[Finance] Erro ao carregar sessões:", error);
+        throw new Error("Falha ao carregar sessões. " + (error instanceof Error ? error.message : ""));
+      }
 
-      const [allPlayers, allReceivables, everyTransaction, everyExpense] = await Promise.all([
-        db.players.orderBy("name").toArray(),
-        db.receivables.toArray(),
-        db.financialTransactions.toArray(),
-        db.sessionExpenses.toArray(),
-      ]);
+      try {
+        await Promise.all(allSessions.map(session => reconcileSessionFiadoBalances(session.id)));
+        console.log("[Finance] Reconciliações concluídas");
+      } catch (error) {
+        console.error("[Finance] Erro ao reconciliar fiados:", error);
+        throw new Error("Falha ao reconciliar dados de fiado. " + (error instanceof Error ? error.message : ""));
+      }
+
+      let allPlayers: DBPlayer[] = [];
+      let allReceivables: DBReceivable[] = [];
+      let everyTransaction: DBFinancialTransaction[] = [];
+      let everyExpense: DBSessionExpense[] = [];
+
+      try {
+        [allPlayers, allReceivables, everyTransaction, everyExpense] = await Promise.all([
+          db.players.orderBy("name").toArray(),
+          db.receivables.toArray(),
+          db.financialTransactions.toArray(),
+          db.sessionExpenses.toArray(),
+        ]);
+        console.log("[Finance] Dados básicos carregados - Jogadores:", allPlayers.length, "Fiados:", allReceivables.length, "Transações:", everyTransaction.length, "Despesas:", everyExpense.length);
+      } catch (error) {
+        console.error("[Finance] Erro ao carregar dados básicos:", error);
+        throw new Error("Falha ao carregar resumo financeiro. " + (error instanceof Error ? error.message : ""));
+      }
+
       setSessions(allSessions);
       setPlayers(allPlayers);
       setReceivables(allReceivables);
@@ -154,16 +180,40 @@ const Finance = () => {
 
       if (preferred) {
         const session = allSessions.find(s => s.id === preferred);
-        const [sessionTxs, sessionExpenses] = await Promise.all([
-          db.financialTransactions.where("sessionId").equals(preferred).toArray(),
-          db.sessionExpenses.where("sessionId").equals(preferred).toArray(),
-        ]);
-        sessionTxs.sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
-        sessionExpenses.sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
-        setTransactions(sessionTxs);
-        setExpenses(sessionExpenses);
-        setFiadoCredits((await calculateSessionFiadoBalances(preferred)).filter(balance => balance.creditAmount > 0));
-        setSummary(session ? await getSessionFinanceSummary(session) : emptySummary);
+        
+        try {
+          const [sessionTxs, sessionExpenses] = await Promise.all([
+            db.financialTransactions.where("sessionId").equals(preferred).toArray(),
+            db.sessionExpenses.where("sessionId").equals(preferred).toArray(),
+          ]);
+          console.log("[Finance] Transações da sessão carregadas:", sessionTxs.length);
+          
+          sessionTxs.sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
+          sessionExpenses.sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
+          setTransactions(sessionTxs);
+          setExpenses(sessionExpenses);
+        } catch (error) {
+          console.error("[Finance] Erro ao carregar transações da sessão:", error);
+          throw new Error("Falha ao carregar contas a receber. " + (error instanceof Error ? error.message : ""));
+        }
+
+        try {
+          const fiadoBalances = await calculateSessionFiadoBalances(preferred);
+          console.log("[Finance] Fiados pendentes:", fiadoBalances.filter(b => b.creditAmount > 0).length);
+          setFiadoCredits(fiadoBalances.filter(balance => balance.creditAmount > 0));
+        } catch (error) {
+          console.error("[Finance] Erro ao calcular fiados:", error);
+          throw new Error("Falha ao carregar contas a pagar. " + (error instanceof Error ? error.message : ""));
+        }
+
+        try {
+          const summary = session ? await getSessionFinanceSummary(session) : emptySummary;
+          console.log("[Finance] Resumo da sessão:", { resultado: summary.netResult, despesas: summary.expenses });
+          setSummary(summary);
+        } catch (error) {
+          console.error("[Finance] Erro ao calcular resumo:", error);
+          throw new Error("Falha ao carregar despesas. " + (error instanceof Error ? error.message : ""));
+        }
       } else {
         setTransactions([]);
         setExpenses([]);
@@ -172,7 +222,8 @@ const Finance = () => {
       }
     } catch (error) {
       console.error("Erro ao carregar financeiro:", error);
-      toast({ title: "Erro", description: "Falha ao carregar dados financeiros.", variant: "destructive" });
+      const errorMessage = error instanceof Error ? error.message : "Falha desconhecida ao carregar dados financeiros.";
+      toast({ title: "Erro", description: errorMessage, variant: "destructive" });
     } finally {
       setLoading(false);
     }

@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { buildPlayerFinancialCycles } from "@/lib/finance-calculator";
 
 // Types matching the old interface (camelCase)
 export type GameType = "texas" | "omaha" | "omaha_hilo" | "5card" | "dealers_choice" | "other";
@@ -18,7 +19,7 @@ export interface DBPlayer {
   nickname: string;
   phone?: string;
   pix?: string;
-  notesó: string;
+  notes: string;
   tags: string[];
   totalWinnings: number;
   totalLosses: number;
@@ -33,8 +34,8 @@ export interface DBCashSession {
   gameType: GameType;
   blinds: string;
   chipValue: number;
-  notesó: string;
-  dealersChoiceGamesó: string;
+  notes: string;
+  dealersChoiceGames: string;
   status: SessionStatus;
   startedAt: string;
   endedAt?: string;
@@ -51,7 +52,7 @@ export interface DBCashPlayer {
   initialBuyin: number;
   totalInvested: number;
   currentChips: number;
-  finalChipsó: number;
+  finalChips: number;
   result?: number;
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
@@ -67,7 +68,7 @@ export interface DBTransaction {
   type: TransactionType;
   amount: number;
   timestamp: string;
-  notesó: string;
+  notes: string;
 }
 
 export interface DBFinancialTransaction {
@@ -78,7 +79,7 @@ export interface DBFinancialTransaction {
   amount: number;
   paymentMethod: FinancialPaymentMethod;
   type: FinancialTransactionType;
-  notesó: string;
+  notes: string;
   occurredAt: string;
   createdAt?: string;
 }
@@ -91,7 +92,7 @@ export interface DBReceivable {
   originalAmount: number;
   paidAmount: number;
   status: ReceivableStatus;
-  notesó: string;
+  notes: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -466,7 +467,7 @@ export async function recordFinancialEntry(input: {
   amount: number;
   paymentMethod: FinancialPaymentMethod;
   type: FinancialTransactionType;
-  notesó: string;
+  notes: string;
   occurredAt?: string;
 }): Promise<DBFinancialTransaction> {
   const now = input.occurredAt || new Date().toISOString();
@@ -504,72 +505,32 @@ export async function recordFinancialEntry(input: {
   return tx;
 }
 
-function findMatchingFinancialTx(
-  tx: DBTransaction,
-  financialTransactions: DBFinancialTransaction[],
-): DBFinancialTransaction | undefined {
-  if (tx.type === "cashout" || tx.type === "withdrawal") return undefined;
-  return financialTransactions.find(item =>
-    item.type === tx.type &&
-    item.amount === tx.amount &&
-    Math.abs(new Date(item.occurredAt).getTime() - new Date(tx.timestamp).getTime()) < 2000
-  );
-}
-
 export function buildPlayerFiadoCycles(input: {
   sessionId: string;
   playerId: string;
   transactions: DBTransaction[];
   financialTransactions: DBFinancialTransaction[];
 }): PlayerFiadoCycle[] {
-  const cycles: PlayerFiadoCycle[] = [];
-  let current: PlayerFiadoCycle | null = null;
-
-  const startCycle = (startedAt: string) => {
-    current = {
-      id: `${input.playerId}:${cycles.length + 1}`,
-      sessionId: input.sessionId,
-      playerId: input.playerId,
-      index: cycles.length + 1,
-      startedAt,
-      totalInvested: 0,
-      totalFiado: 0,
-      totalCashout: 0,
-      result: 0,
-      debtAmount: 0,
-      creditAmount: 0,
-      transactions: [],
-    };
-  };
-
-  const finishCycle = (endedAt?: string) => {
-    if (!current) return;
-    current.endedAt = endedAt;
-    current.result = current.totalCashout - current.totalInvested;
-    current.debtAmount = Math.max(current.totalFiado - current.totalCashout, 0);
-    current.creditAmount = current.totalFiado > 0 ? Math.max(current.totalCashout - current.totalFiado, 0) : 0;
-    cycles.push(current);
-    current = null;
-  };
-
-  for (const tx of input.transactions.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())) {
-    if (!current) startCycle(tx.timestamp);
-    current!.transactions.push(tx);
-
-    if (tx.type === "buyin" || tx.type === "rebuy" || tx.type === "addon") {
-      current!.totalInvested += tx.amount;
-      const financialTx = findMatchingFinancialTx(tx, input.financialTransactions);
-      if (financialTx?.paymentMethod === "fiado") current!.totalFiado += tx.amount;
-    }
-
-    if (tx.type === "cashout") {
-      current!.totalCashout += tx.amount;
-      finishCycle(tx.timestamp);
-    }
-  }
-
-  finishCycle();
-  return cycles.filter(cycle => cycle.totalInvested > 0 || cycle.totalFiado > 0 || cycle.totalCashout > 0);
+  // Usa o novo serviço centralizado para garantir coerência
+  const cycles = buildPlayerFinancialCycles(input);
+  
+  // Mapeia para a interface PlayerFiadoCycle para manter compatibilidade
+  return cycles.map(cycle => ({
+    ...cycle,
+    id: cycle.id,
+    sessionId: cycle.sessionId,
+    playerId: cycle.playerId,
+    index: cycle.index,
+    startedAt: cycle.startedAt,
+    endedAt: cycle.endedAt,
+    totalInvested: cycle.totalInvested,
+    totalFiado: cycle.totalFiado,
+    totalCashout: cycle.totalCashout,
+    result: cycle.result,
+    debtAmount: cycle.debtAmount,
+    creditAmount: cycle.creditAmount,
+    transactions: cycle.transactions,
+  })) as PlayerFiadoCycle[];
 }
 
 export async function calculatePlayerFiadoBalance(sessionId: string, playerId: string): Promise<PlayerFiadoBalance> {
@@ -702,7 +663,7 @@ export async function payReceivable(input: {
   receivable: DBReceivable;
   amount: number;
   paymentMethod: ReceivablePaymentMethod;
-  notesó: string;
+  notes: string;
   occurredAt?: string;
 }): Promise<void> {
   const now = input.occurredAt || new Date().toISOString();

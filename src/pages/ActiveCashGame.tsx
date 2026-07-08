@@ -166,36 +166,44 @@ const ActiveCashGame = () => {
       const txRows = cycle.transactions.map(tx =>
         `<div class="row"><span>${formatTime(tx.timestamp)} ${escapeHtml(txLabelMap[tx.type] ?? tx.type)}</span><strong>R$ ${tx.amount.toFixed(2)}${paymentForTx(tx) ? ` - ${escapeHtml(paymentForTx(tx))}` : ""}</strong></div>`
       ).join("");
-      return `<div class="sub"><b>Ciclo ${cycle.index}</b>
-        <div class="row"><span>Entrada</span><strong>${formatTime(cycle.startedAt)}</strong></div>
+      return `<div class="sub">
+        <b style="font-size:1.1em;">CICLO ${cycle.index}</b>
+        <div style="border-top:1px solid #999;padding-top:3px;margin-top:3px;"></div>
+        <div class="row"><span style="font-weight:bold;">Entrada</span><strong style="font-weight:bold;">${formatTime(cycle.startedAt)}</strong></div>
+        <div style="margin:4px 0;"></div>
         ${txRows}
-        <div class="row"><span>Total investido</span><strong>R$ ${cycle.totalInvested.toFixed(2)}</strong></div>
-        <div class="row"><span>Total fiado</span><strong>R$ ${cycle.totalFiado.toFixed(2)}</strong></div>
-        <div class="row"><span>Cash-out</span><strong>R$ ${cycle.totalCashout.toFixed(2)}</strong></div>
-        <div class="row"><span>Resultado</span><strong>R$ ${cycle.result >= 0 ? "+" : ""}${cycle.result.toFixed(2)}</strong></div>
+        <div style="border-top:1px dashed #999;padding-top:3px;margin-top:3px;"></div>
+        <div class="row"><span style="font-size:0.95em;">Total investido</span><strong>R$ ${cycle.totalInvested.toFixed(2)}</strong></div>
+        <div class="row"><span style="font-size:0.95em;">Total fiado</span><strong>R$ ${cycle.totalFiado.toFixed(2)}</strong></div>
+        <div class="row"><span style="font-size:0.95em;">Cash-out</span><strong>R$ ${cycle.totalCashout.toFixed(2)}</strong></div>
+        <div class="row"><span style="font-weight:bold;">Resultado ciclo</span><strong style="font-weight:bold;">R$ ${cycle.result >= 0 ? "+" : ""}${cycle.result.toFixed(2)}</strong></div>
         <div class="row"><span>Cliente paga</span><strong>R$ ${cycle.debtAmount.toFixed(2)}</strong></div>
         <div class="row"><span>Cliente recebe</span><strong>R$ ${cycle.creditAmount.toFixed(2)}</strong></div>
+        <div style="margin:6px 0;"></div>
       </div>`;
     }).join("");
     return `
       <!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=80mm, initial-scale=1" /><title>Recibo - ${escapeHtml(sp.player?.name ?? "Jogador")}</title></head><body>
         <main class="receipt">
-        <h2>Cash Game Pro</h2>
-        <p class="center" style="font-size:0.9em;">${escapeHtml(session.name)} - ${escapeHtml(session.blinds)}</p>
+        <h2>CASH GAME PRO</h2>
+        <p class="center" style="font-size:0.9em;border-bottom:1px solid #000;padding-bottom:4px;">${escapeHtml(session.name)} - ${escapeHtml(session.blinds)}</p>
         <div class="row"><span>Jogador:</span><strong>${escapeHtml(sp.player?.name ?? "Jogador")}</strong></div>
         <div class="row"><span>Buy-in inicial:</span><span>R$ ${sp.initialBuyin.toFixed(2)}</span></div>
         <div class="row"><span>Total investido:</span><span>R$ ${sp.totalInvested.toFixed(2)}</span></div>
         <div class="row"><span>Fichas finais:</span><span>R$ ${(sp.finalChips ?? 0).toFixed(2)}</span></div>
         <div class="row"><span>Tempo jogado:</span><span>${timePlayed}</span></div>
         <div class="row"><span>Pagamento:</span><span>${paymentLabel}</span></div>
+        <div style="border-top:1px dashed #000;margin:8px 0;padding-top:6px;"></div>
         ${cycleSections}
-        <div class="sub"><b>Resumo final</b>
+        <div style="border-top:2px solid #000;margin:8px 0;padding-top:6px;"></div>
+        <div class="sub"><b style="font-size:1.1em;">RESUMO GERAL</b>
           <div class="row"><span>Total investido</span><strong>R$ ${receiptTotalInvested.toFixed(2)}</strong></div>
           <div class="row"><span>Total fiado</span><strong>R$ ${totalFiado.toFixed(2)}</strong></div>
           <div class="row"><span>Total cash-out</span><strong>R$ ${totalCashout.toFixed(2)}</strong></div>
-          <div class="row"><span>Resultado final</span><strong>R$ ${receiptResult >= 0 ? "+" : ""}${receiptResult.toFixed(2)}</strong></div>
-          <div class="row"><span>Cliente paga</span><strong>R$ ${customerPays.toFixed(2)}</strong></div>
-          <div class="row"><span>Cliente recebe</span><strong>R$ ${customerReceives.toFixed(2)}</strong></div>
+          <div style="border-top:1px dashed #999;padding-top:3px;margin-top:3px;"></div>
+          <div class="row"><span style="font-weight:bold;">Resultado final</span><strong style="font-weight:bold;font-size:1.05em;">R$ ${receiptResult >= 0 ? "+" : ""}${receiptResult.toFixed(2)}</strong></div>
+          <div class="row"><span style="font-weight:bold;">Cliente paga</span><strong style="font-weight:bold;">R$ ${customerPays.toFixed(2)}</strong></div>
+          <div class="row"><span style="font-weight:bold;">Cliente recebe</span><strong style="font-weight:bold;">R$ ${customerReceives.toFixed(2)}</strong></div>
         </div>
         <div class="result ${receiptResult >= 0 ? "positive" : "negative"}">
           Resultado: R$ ${receiptResult >= 0 ? "+" : ""}${receiptResult.toFixed(2)}
