@@ -471,6 +471,9 @@ export async function recordFinancialEntry(input: {
   occurredAt?: string;
 }): Promise<DBFinancialTransaction> {
   const now = input.occurredAt || new Date().toISOString();
+  if (typeof input.amount !== 'number' || Number.isNaN(input.amount) || input.amount <= 0) {
+    throw new Error("Invalid financial entry amount. Amount must be a positive number.");
+  }
   const tx: DBFinancialTransaction = {
     id: generateId(),
     sessionId: input.sessionId,
@@ -484,6 +487,7 @@ export async function recordFinancialEntry(input: {
   await db.financialTransactions.add(tx);
 
   if (input.paymentMethod === "fiado" && input.playerId) {
+    // Only create receivable when amount is positive (guard above ensures this)
     const receivable: DBReceivable = {
       id: generateId(),
       sessionId: input.sessionId,
@@ -602,36 +606,50 @@ export async function reconcilePlayerFiadoBalance(sessionId: string, playerId: s
     .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   const primary = playerReceivables[0];
   const clampedPaid = Math.min(balance.debtAmount, playerReceivables.reduce((sum, item) => sum + item.paidAmount, 0));
-
+  // If there is no primary receivable and the calculated debt is positive, create one.
   if (!primary && balance.debtAmount > 0) {
-    await db.receivables.add({
-      id: generateId(),
-      sessionId,
-      playerId,
-      originalAmount: balance.debtAmount,
-      paidAmount: 0,
-      status: "open",
-      notes: "Saldo fiado l?quido",
-      createdAt: now,
-      updatedAt: now,
-    });
+    const amountToCreate = Math.max(0, Math.floor(balance.debtAmount * 100) / 100);
+    if (amountToCreate > 0) {
+      await db.receivables.add({
+        id: generateId(),
+        sessionId,
+        playerId,
+        originalAmount: amountToCreate,
+        paidAmount: 0,
+        status: "open",
+        notes: "Saldo fiado líquido",
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
     return { ...balance, paidAmount: 0, openDebt: balance.debtAmount };
   }
 
   if (primary) {
-    await db.receivables.update(primary.id, {
-      originalAmount: balance.debtAmount,
-      paidAmount: clampedPaid,
-      status: clampedPaid >= balance.debtAmount ? "paid" : "open",
-      notes: "Saldo fiado l?quido",
-      updatedAt: now,
-    });
+    // If the calculated debt is positive, update the primary receivable to reflect the debt.
+    if (balance.debtAmount > 0) {
+      await db.receivables.update(primary.id, {
+        originalAmount: Math.max(0, Math.floor(balance.debtAmount * 100) / 100),
+        paidAmount: clampedPaid,
+        status: clampedPaid >= balance.debtAmount ? "paid" : "open",
+        notes: "Saldo fiado líquido",
+        updatedAt: now,
+      });
+    } else {
+      // No debt: mark existing primary as paid (do not set originalAmount to 0 to avoid DB constraint violations)
+      await db.receivables.update(primary.id, {
+        paidAmount: primary.paidAmount >= primary.originalAmount ? primary.paidAmount : primary.originalAmount,
+        status: "paid",
+        notes: "Saldo fiado liquidado",
+        updatedAt: now,
+      });
+    }
   }
 
+  // Mark any additional receivables as paid, but keep originalAmount intact to respect DB constraints.
   for (const item of playerReceivables.slice(1)) {
     await db.receivables.update(item.id, {
-      originalAmount: 0,
-      paidAmount: 0,
+      paidAmount: item.paidAmount >= item.originalAmount ? item.paidAmount : item.originalAmount,
       status: "paid",
       updatedAt: now,
     });

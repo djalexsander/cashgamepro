@@ -101,7 +101,13 @@ const ActiveCashGame = () => {
     try {
       const s = await db.cashSessions.get(id);
       if (!s) { navigate("/cash-games"); return; }
-      await reconcileSessionFiadoBalances(id);
+      try {
+        await reconcileSessionFiadoBalances(id);
+      } catch (error) {
+        console.error("[ActiveCashGame] Falha ao reconciliar contas a receber", error);
+        toast({ title: "Atenção", description: "Falha ao reconciliar contas a receber.", variant: "destructive" });
+        // continue loading the session even if reconciliation fails
+      }
       setSession(s);
 
       const cps = await db.cashPlayers.where("sessionId").equals(id).toArray();
@@ -119,8 +125,10 @@ const ActiveCashGame = () => {
       const ap = await db.players.orderBy("name").toArray();
       setAllPlayers(ap);
     } catch (error) {
-      console.error("Erro ao carregar sessão:", error);
-      toast({ title: "Erro", description: "Falha ao carregar sessão.", variant: "destructive" });
+      console.error("[ActiveCashGame] Falha ao carregar sessão", error);
+      const message = error instanceof Error ? error.message : String(error);
+      toast({ title: "Erro", description: `Falha ao carregar sessão: ${message}`, variant: "destructive" });
+      throw error;
     }
   };
 

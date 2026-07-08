@@ -3,10 +3,27 @@
  * Evita duplicação de lógica e garante coerência em todas as telas
  */
 
-import {
-  type DBTransaction,
-  type DBFinancialTransaction,
-} from "@/db/database";
+// To avoid circular imports with src/db/database.ts, define minimal local
+// types used by this calculator. These match the shapes required here only.
+export type DBTransaction = {
+  id?: string;
+  sessionId?: string;
+  cashPlayerId?: string;
+  type: "buyin" | "rebuy" | "addon" | "withdrawal" | "cashout";
+  amount: number;
+  timestamp: string;
+  // other fields intentionally omitted
+};
+
+export type DBFinancialTransaction = {
+  id?: string;
+  sessionId?: string;
+  playerId?: string;
+  amount: number;
+  paymentMethod?: "cash" | "pix" | "credit" | "debit" | "fiado";
+  type?: string;
+  occurredAt: string;
+};
 
 export interface PlayerCycle {
   id: string;
