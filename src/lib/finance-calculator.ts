@@ -117,8 +117,8 @@ export function buildPlayerFinancialCycles(input: {
 
     current!.transactions.push(tx);
 
-    // Acumula investimentos (buy-in, rebuy, add-on)
-    if (tx.type === "buyin" || tx.type === "rebuy" || tx.type === "addon") {
+    // Acumula investimentos (buy-in, rebuy). Add-on é ignorado para Cash Game.
+    if (tx.type === "buyin" || tx.type === "rebuy") {
       current!.totalInvested += tx.amount;
       
       // Verifica se este investimento foi em fiado

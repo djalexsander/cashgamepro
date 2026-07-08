@@ -56,7 +56,7 @@ const ActiveCashGame = () => {
 
   // Chips dialog
   const [chipsDialogOpen, setChipsDialogOpen] = useState(false);
-  const [chipsAction, setChipsAction] = useState<"add" | "remove" | "rebuy">("add");
+  const [chipsAction, setChipsAction] = useState<"remove" | "rebuy">("rebuy");
   const [chipsAmount, setChipsAmount] = useState("");
   const [chipsPaymentMethod, setChipsPaymentMethod] = useState<FinancialPaymentMethod>("cash");
   const [chipsTargetId, setChipsTargetId] = useState("");
@@ -87,13 +87,13 @@ const ActiveCashGame = () => {
     .replace(/'/g, "&#039;");
 
   const txLabelMap: Record<string, string> = {
-    buyin: "Buy-in", rebuy: "Rebuy", addon: "Add-on", withdrawal: "Retirada", cashout: "Cash-out",
+    buyin: "Buy-in", rebuy: "Rebuy", withdrawal: "Retirada", cashout: "Cash-out",
   };
   const paymentLabelMap: Record<string, string> = {
     cash: "Dinheiro", pix: "PIX", credit: "Crédito", debit: "Débito", fiado: "Fiado", pending: "Pendente",
   };
   const txIconMap: Record<string, typeof LogIn> = {
-    buyin: LogIn, rebuy: RotateCcw, addon: ArrowUpCircle, withdrawal: ArrowDownCircle, cashout: LogOut,
+    buyin: LogIn, rebuy: RotateCcw, withdrawal: ArrowDownCircle, cashout: LogOut,
   };
 
   const load = async () => {
@@ -163,9 +163,11 @@ const ActiveCashGame = () => {
     const customerPays = cycles.reduce((sum, cycle) => sum + cycle.debtAmount, 0);
     const customerReceives = cycles.reduce((sum, cycle) => sum + cycle.creditAmount, 0);
     const cycleSections = cycles.map(cycle => {
-      const txRows = cycle.transactions.map(tx =>
-        `<div class="row"><span>${formatTime(tx.timestamp)} ${escapeHtml(txLabelMap[tx.type] ?? tx.type)}</span><strong>R$ ${tx.amount.toFixed(2)}${paymentForTx(tx) ? ` - ${escapeHtml(paymentForTx(tx))}` : ""}</strong></div>`
-      ).join("");
+      const txRows = cycle.transactions
+        .filter(tx => tx.type !== "addon")
+        .map(tx =>
+          `<div class="row"><span>${formatTime(tx.timestamp)} ${escapeHtml(txLabelMap[tx.type] ?? tx.type)}</span><strong>R$ ${tx.amount.toFixed(2)}${paymentForTx(tx) ? ` - ${escapeHtml(paymentForTx(tx))}` : ""}</strong></div>`
+        ).join("");
       return `<div class="sub">
         <b style="font-size:1.1em;">CICLO ${cycle.index}</b>
         <div style="border-top:1px solid #999;padding-top:3px;margin-top:3px;"></div>
@@ -339,12 +341,12 @@ const ActiveCashGame = () => {
       const now = new Date().toISOString();
       let newChips = cp.currentChips;
       let newInvested = cp.totalInvested;
-      let txType: DBTransaction["type"] = "addon";
+      let txType: DBTransaction["type"] = "rebuy";
 
-      if (chipsAction === "add" || chipsAction === "rebuy") {
+      if (chipsAction === "rebuy") {
         newChips += amount;
         newInvested += amount;
-        txType = chipsAction === "rebuy" ? "rebuy" : "addon";
+        txType = "rebuy";
       } else {
         newChips -= amount;
         txType = "withdrawal";
@@ -356,7 +358,7 @@ const ActiveCashGame = () => {
         type: txType, amount, timestamp: now,
       });
 
-      if (txType === "rebuy" || txType === "addon") {
+      if (txType === "rebuy") {
         await recordFinancialEntry({
           sessionId: id!,
           playerId: cp.playerId,
@@ -369,15 +371,15 @@ const ActiveCashGame = () => {
           await reconcilePlayerFiadoBalance(id!, cp.playerId);
         }
       }
-
-      toast({ title: "Movimentação registrada!", description: `${chipsAction === "remove" ? "Retirada" : chipsAction === "rebuy" ? "Rebuy" : "Add-on"}: R$ ${amount.toFixed(2)}` });
+      toast({ title: "Movimentação registrada!", description: `${chipsAction === "remove" ? "Retirada" : "Rebuy"}: R$ ${amount.toFixed(2)}` });
       setChipsDialogOpen(false);
       setChipsAmount("");
       setChipsPaymentMethod("cash");
       load();
     } catch (error) {
-      console.error("Erro:", error);
-      toast({ title: "Erro", description: "Falha na movimentação.", variant: "destructive" });
+      console.error(`[ActiveCashGame] Falha ao processar movimentação (${chipsAction}):`, error);
+      const message = error instanceof Error ? error.message : String(error);
+      toast({ title: "Erro", description: `Falha ao registrar ${chipsAction === "remove" ? "Retirada" : "Rebuy"}: ${message}`, variant: "destructive" });
     }
   };
 
@@ -670,9 +672,6 @@ const ActiveCashGame = () => {
 
               {cp.isActive ? (
                 <div className="grid grid-cols-4 gap-1">
-                  <Button size="sm" variant="outline" className="text-xs h-8" onClick={() => { setChipsTargetId(cp.id); setChipsAction("add"); setChipsDialogOpen(true); }}>
-                    <PlusCircle className="w-3 h-3 mr-1" /> Add-on
-                  </Button>
                   <Button size="sm" variant="outline" className="text-xs h-8" onClick={() => { setChipsTargetId(cp.id); setChipsAction("remove"); setChipsDialogOpen(true); }}>
                     <MinusCircle className="w-3 h-3 mr-1" /> Retirada
                   </Button>
