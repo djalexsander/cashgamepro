@@ -74,8 +74,7 @@ const receiptHtmlToText = (receipt: HTMLElement, widthMm: 58 | 80) => {
     if (parts.length >= 2) lines.push(row(parts[0], parts.slice(1).join(" "), cols));
   });
 
-  const sub = receipt.querySelector(":scope > .sub");
-  if (sub) {
+  receipt.querySelectorAll(":scope > .sub").forEach((sub) => {
     const heading = normalizeText(sub.querySelector("b")?.textContent);
     lines.push(line(cols));
     if (heading) lines.push(heading);
@@ -83,7 +82,7 @@ const receiptHtmlToText = (receipt: HTMLElement, widthMm: 58 | 80) => {
       const parts = Array.from(node.querySelectorAll("span, strong")).map((part) => normalizeText(part.textContent));
       if (parts.length >= 2) lines.push(row(parts[0], parts.slice(1).join(" "), cols));
     });
-  }
+  });
 
   const result = normalizeText(receipt.querySelector(":scope > .result")?.textContent);
   if (result) {

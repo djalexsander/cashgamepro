@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,10 +9,14 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import {
   db,
   generateId,
+  buildPlayerFiadoCycles,
   getSessionFinanceSummary,
   recordFinancialEntry,
+  reconcilePlayerFiadoBalance,
+  reconcileSessionFiadoBalances,
   type DBCashSession,
   type DBCashPlayer,
+  type DBFinancialTransaction,
   type DBPlayer,
   type DBTransaction,
   type FinancialPaymentMethod,
@@ -36,6 +40,7 @@ const ActiveCashGame = () => {
   const [cashPlayers, setCashPlayers] = useState<(DBCashPlayer & { player?: DBPlayer })[]>([]);
   const [allPlayers, setAllPlayers] = useState<DBPlayer[]>([]);
   const [transactions, setTransactions] = useState<DBTransaction[]>([]);
+  const [financialTransactions, setFinancialTransactions] = useState<DBFinancialTransaction[]>([]);
   const [financeSummary, setFinanceSummary] = useState<SessionFinanceSummary | null>(null);
 
   // Add player dialog
@@ -79,6 +84,9 @@ const ActiveCashGame = () => {
   const txLabelMap: Record<string, string> = {
     buyin: "Buy-in", rebuy: "Rebuy", addon: "Add Fichas", withdrawal: "Retirada", cashout: "Cash Out",
   };
+  const paymentLabelMap: Record<string, string> = {
+    cash: "Dinheiro", pix: "Pix", credit: "Credito", debit: "Debito", fiado: "Fiado", pending: "Pendente",
+  };
   const txIconMap: Record<string, typeof LogIn> = {
     buyin: LogIn, rebuy: RotateCcw, addon: ArrowUpCircle, withdrawal: ArrowDownCircle, cashout: LogOut,
   };
@@ -88,6 +96,7 @@ const ActiveCashGame = () => {
     try {
       const s = await db.cashSessions.get(id);
       if (!s) { navigate("/cash-games"); return; }
+      await reconcileSessionFiadoBalances(id);
       setSession(s);
 
       const cps = await db.cashPlayers.where("sessionId").equals(id).toArray();
@@ -98,13 +107,15 @@ const ActiveCashGame = () => {
 
       const txs = await db.transactions.where("sessionId").equals(id).toArray();
       setTransactions(txs);
+      const financialTxs = await db.financialTransactions.where("sessionId").equals(id).toArray();
+      setFinancialTransactions(financialTxs);
       setFinanceSummary(await getSessionFinanceSummary(s));
 
       const ap = await db.players.orderBy("name").toArray();
       setAllPlayers(ap);
     } catch (error) {
-      console.error("Erro ao carregar sessão:", error);
-      toast({ title: "Erro", description: "Falha ao carregar sessão.", variant: "destructive" });
+      console.error("Erro ao carregar sessÃ£o:", error);
+      toast({ title: "Erro", description: "Falha ao carregar sessÃ£o.", variant: "destructive" });
     }
   };
 
@@ -113,33 +124,76 @@ const ActiveCashGame = () => {
   // Build the printable HTML for a player's financial summary
   const buildSummaryHtml = (sp: (DBCashPlayer & { player?: DBPlayer })) => {
     if (!session) return "";
-    const result = sp.result ?? 0;
-    const positive = result >= 0;
     const minutes = sp.closedAt
       ? Math.floor((new Date(sp.closedAt).getTime() - new Date(sp.joinedAt).getTime()) / 60000)
       : 0;
     const timePlayed = `${Math.floor(minutes / 60)}h${(minutes % 60).toString().padStart(2, "0")}m`;
     const paymentLabel = sp.paymentStatus === "paid" ? "Pago" : sp.paymentStatus === "received" ? "Recebido" : "Pendente";
+    const playerCashPlayerIds = new Set(cashPlayers.filter(cp => cp.playerId === sp.playerId).map(cp => cp.id));
+    playerCashPlayerIds.add(sp.id);
     const playerTxs = transactions
-      .filter(t => t.cashPlayerId === sp.id)
+      .filter(t => playerCashPlayerIds.has(t.cashPlayerId))
       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-    const txRows = playerTxs.map(tx =>
-      `<div class="row"><span>${formatTime(tx.timestamp)} ${escapeHtml(txLabelMap[tx.type] ?? tx.type)}</span><strong>R$ ${tx.amount.toFixed(2)}</strong></div>`
-    ).join("");
+    const paymentForTx = (tx: DBTransaction) => {
+      if (tx.type === "cashout" || tx.type === "withdrawal") return "";
+      const financialTx = financialTransactions.find(item =>
+        item.playerId === sp.playerId &&
+        item.type === tx.type &&
+        item.amount === tx.amount &&
+        Math.abs(new Date(item.occurredAt).getTime() - new Date(tx.timestamp).getTime()) < 2000
+      );
+      return financialTx ? paymentLabelMap[financialTx.paymentMethod] ?? financialTx.paymentMethod : "";
+    };
+    const playerFinancialTxs = financialTransactions.filter(tx => tx.playerId === sp.playerId);
+    const cycles = buildPlayerFiadoCycles({
+      sessionId: session.id,
+      playerId: sp.playerId,
+      transactions: playerTxs,
+      financialTransactions: playerFinancialTxs,
+    });
+    const receiptTotalInvested = cycles.reduce((sum, cycle) => sum + cycle.totalInvested, 0);
+    const totalFiado = cycles.reduce((sum, cycle) => sum + cycle.totalFiado, 0);
+    const totalCashout = cycles.reduce((sum, cycle) => sum + cycle.totalCashout, 0);
+    const receiptResult = cycles.reduce((sum, cycle) => sum + cycle.result, 0);
+    const customerPays = cycles.reduce((sum, cycle) => sum + cycle.debtAmount, 0);
+    const customerReceives = cycles.reduce((sum, cycle) => sum + cycle.creditAmount, 0);
+    const cycleSections = cycles.map(cycle => {
+      const txRows = cycle.transactions.map(tx =>
+        `<div class="row"><span>${formatTime(tx.timestamp)} ${escapeHtml(txLabelMap[tx.type] ?? tx.type)}</span><strong>R$ ${tx.amount.toFixed(2)}${paymentForTx(tx) ? ` - ${escapeHtml(paymentForTx(tx))}` : ""}</strong></div>`
+      ).join("");
+      return `<div class="sub"><b>Ciclo ${cycle.index}</b>
+        <div class="row"><span>Entrada</span><strong>${formatTime(cycle.startedAt)}</strong></div>
+        ${txRows}
+        <div class="row"><span>Total investido</span><strong>R$ ${cycle.totalInvested.toFixed(2)}</strong></div>
+        <div class="row"><span>Total fiado</span><strong>R$ ${cycle.totalFiado.toFixed(2)}</strong></div>
+        <div class="row"><span>Cashout</span><strong>R$ ${cycle.totalCashout.toFixed(2)}</strong></div>
+        <div class="row"><span>Resultado</span><strong>R$ ${cycle.result >= 0 ? "+" : ""}${cycle.result.toFixed(2)}</strong></div>
+        <div class="row"><span>Cliente paga</span><strong>R$ ${cycle.debtAmount.toFixed(2)}</strong></div>
+        <div class="row"><span>Cliente recebe</span><strong>R$ ${cycle.creditAmount.toFixed(2)}</strong></div>
+      </div>`;
+    }).join("");
     return `
       <!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=80mm, initial-scale=1" /><title>Recibo - ${escapeHtml(sp.player?.name ?? "Jogador")}</title></head><body>
         <main class="receipt">
         <h2>Cash Game Pro</h2>
-        <p class="center" style="font-size:0.9em;">${escapeHtml(session.name)} • ${escapeHtml(session.blinds)}</p>
+        <p class="center" style="font-size:0.9em;">${escapeHtml(session.name)} â€¢ ${escapeHtml(session.blinds)}</p>
         <div class="row"><span>Jogador:</span><strong>${escapeHtml(sp.player?.name ?? "Jogador")}</strong></div>
         <div class="row"><span>Buy-in inicial:</span><span>R$ ${sp.initialBuyin.toFixed(2)}</span></div>
         <div class="row"><span>Total investido:</span><span>R$ ${sp.totalInvested.toFixed(2)}</span></div>
         <div class="row"><span>Fichas finais:</span><span>R$ ${(sp.finalChips ?? 0).toFixed(2)}</span></div>
         <div class="row"><span>Tempo jogado:</span><span>${timePlayed}</span></div>
         <div class="row"><span>Pagamento:</span><span>${paymentLabel}</span></div>
-        ${txRows ? `<div class="sub"><b>Movimentações</b>${txRows}</div>` : ""}
-        <div class="result ${positive ? "positive" : "negative"}">
-          Resultado: R$ ${positive ? "+" : ""}${result.toFixed(2)}
+        ${cycleSections}
+        <div class="sub"><b>Resumo final</b>
+          <div class="row"><span>Total investido</span><strong>R$ ${receiptTotalInvested.toFixed(2)}</strong></div>
+          <div class="row"><span>Total fiado</span><strong>R$ ${totalFiado.toFixed(2)}</strong></div>
+          <div class="row"><span>Total cashout</span><strong>R$ ${totalCashout.toFixed(2)}</strong></div>
+          <div class="row"><span>Resultado final</span><strong>R$ ${receiptResult >= 0 ? "+" : ""}${receiptResult.toFixed(2)}</strong></div>
+          <div class="row"><span>Cliente paga</span><strong>R$ ${customerPays.toFixed(2)}</strong></div>
+          <div class="row"><span>Cliente recebe</span><strong>R$ ${customerReceives.toFixed(2)}</strong></div>
+        </div>
+        <div class="result ${receiptResult >= 0 ? "positive" : "negative"}">
+          Resultado: R$ ${receiptResult >= 0 ? "+" : ""}${receiptResult.toFixed(2)}
         </div>
         <div class="footer"><p>Cash Game Pro</p><p>Documento gerado automaticamente</p></div>
         </main>
@@ -153,8 +207,8 @@ const ActiveCashGame = () => {
 
     if (!sp || !session) {
       toast({
-        title: "Recibo indisponível",
-        description: "Não há dados suficientes para imprimir este recibo.",
+        title: "Recibo indisponÃ­vel",
+        description: "NÃ£o hÃ¡ dados suficientes para imprimir este recibo.",
         variant: "destructive",
       });
       return;
@@ -162,8 +216,8 @@ const ActiveCashGame = () => {
 
     if (printInProgressRef.current) {
       toast({
-        title: "Impressão em andamento",
-        description: "Aguarde a impressão atual terminar antes de tentar novamente.",
+        title: "ImpressÃ£o em andamento",
+        description: "Aguarde a impressÃ£o atual terminar antes de tentar novamente.",
       });
       return;
     }
@@ -182,7 +236,7 @@ const ActiveCashGame = () => {
         description:
           error instanceof Error
             ? error.message
-            : "O Desktop/Tauri ou o navegador recusou a chamada de impressão.",
+            : "O Desktop/Tauri ou o navegador recusou a chamada de impressÃ£o.",
         variant: "destructive",
       });
     } finally {
@@ -248,7 +302,7 @@ const ActiveCashGame = () => {
         occurredAt: now,
       });
 
-      toast({ title: "Jogador adicionado! ♠", description: `Buy-in de R$ ${amount.toFixed(2)}` });
+      toast({ title: "Jogador adicionado! â™ ", description: `Buy-in de R$ ${amount.toFixed(2)}` });
       setAddPlayerOpen(false);
       setSelectedPlayerId("");
       setInitialBuyin("");
@@ -298,16 +352,19 @@ const ActiveCashGame = () => {
           type: txType,
           occurredAt: now,
         });
+        if (chipsPaymentMethod === "fiado") {
+          await reconcilePlayerFiadoBalance(id!, cp.playerId);
+        }
       }
 
-      toast({ title: "Movimentação registrada!", description: `${chipsAction === "remove" ? "Retirada" : chipsAction === "rebuy" ? "Rebuy" : "Add"}: R$ ${amount.toFixed(2)}` });
+      toast({ title: "MovimentaÃ§Ã£o registrada!", description: `${chipsAction === "remove" ? "Retirada" : chipsAction === "rebuy" ? "Rebuy" : "Add"}: R$ ${amount.toFixed(2)}` });
       setChipsDialogOpen(false);
       setChipsAmount("");
       setChipsPaymentMethod("cash");
       load();
     } catch (error) {
       console.error("Erro:", error);
-      toast({ title: "Erro", description: "Falha na movimentação.", variant: "destructive" });
+      toast({ title: "Erro", description: "Falha na movimentaÃ§Ã£o.", variant: "destructive" });
     }
   };
 
@@ -322,8 +379,9 @@ const ActiveCashGame = () => {
 
     try {
       const result = chips - cp.totalInvested;
+      const now = new Date().toISOString();
       await db.cashPlayers.update(closeTargetId, {
-        finalChips: chips, result, isActive: false, closedAt: new Date().toISOString(), currentChips: chips,
+        finalChips: chips, result, isActive: false, closedAt: now, currentChips: chips,
       });
 
       if (result >= 0) {
@@ -332,10 +390,13 @@ const ActiveCashGame = () => {
         await db.players.where("id").equals(cp.playerId).modify(p => { p.totalLosses += Math.abs(result); p.totalSessions += 1; });
       }
 
-      await db.transactions.add({
+      const cashoutTx: DBTransaction = {
         id: generateId(), sessionId: id!, cashPlayerId: closeTargetId,
-        type: "cashout", amount: chips, timestamp: new Date().toISOString(),
-      });
+        type: "cashout", amount: chips, timestamp: now,
+      };
+      await db.transactions.add(cashoutTx);
+      await reconcilePlayerFiadoBalance(id!, cp.playerId);
+      setTransactions(prev => [...prev, cashoutTx]);
 
       toast({ title: "Jogador fechado!", description: `Resultado: R$ ${result >= 0 ? "+" : ""}${result.toFixed(2)}` });
       setClosePlayerOpen(false);
@@ -345,7 +406,7 @@ const ActiveCashGame = () => {
         finalChips: chips,
         result,
         isActive: false,
-        closedAt: new Date().toISOString(),
+        closedAt: now,
         currentChips: chips,
       });
       setSummaryOpen(true);
@@ -372,6 +433,7 @@ const ActiveCashGame = () => {
       const txs = await db.transactions.where("sessionId").equals(id!).toArray();
       const cashoutTx = txs.filter(t => t.cashPlayerId === cashPlayerId && t.type === "cashout").sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
       if (cashoutTx) await db.transactions.delete(cashoutTx.id);
+      await reconcilePlayerFiadoBalance(id!, cp.playerId);
 
       // Reopen the player
       await db.cashPlayers.update(cashPlayerId, {
@@ -379,7 +441,7 @@ const ActiveCashGame = () => {
         currentChips: cp.totalInvested,
       });
 
-      toast({ title: "Jogador reaberto! 🔄", description: `${cp.player?.name ?? "Jogador"} voltou à mesa.` });
+      toast({ title: "Jogador reaberto! ðŸ”„", description: `${cp.player?.name ?? "Jogador"} voltou Ã  mesa.` });
       load();
     } catch (error) {
       console.error("Erro ao reabrir jogador:", error);
@@ -400,11 +462,11 @@ const ActiveCashGame = () => {
 
   const handleEndSession = async () => {
     if (activePlayers.length > 0) {
-      toast({ title: "Atenção", description: `Feche todos os jogadores antes de encerrar. (${activePlayers.length} ativos)`, variant: "destructive" });
+      toast({ title: "AtenÃ§Ã£o", description: `Feche todos os jogadores antes de encerrar. (${activePlayers.length} ativos)`, variant: "destructive" });
       return;
     }
     if (cashPlayers.length === 0) {
-      toast({ title: "Atenção", description: "Nenhum jogador participou desta sessão.", variant: "destructive" });
+      toast({ title: "AtenÃ§Ã£o", description: "Nenhum jogador participou desta sessÃ£o.", variant: "destructive" });
       return;
     }
     // Show summary dialog
@@ -413,7 +475,7 @@ const ActiveCashGame = () => {
 
   const confirmEndSession = async () => {
     if (totalReturned > totalInvested) {
-      toast({ title: "Erro de conferência", description: "Valor devolvido maior que o investido. Verifique as fichas finais.", variant: "destructive" });
+      toast({ title: "Erro de conferÃªncia", description: "Valor devolvido maior que o investido. Verifique as fichas finais.", variant: "destructive" });
       return;
     }
     try {
@@ -428,7 +490,7 @@ const ActiveCashGame = () => {
       console.log("[EndSession] Update result:", updated);
       
       if (updated === 0) {
-        toast({ title: "Erro", description: "Sessão não encontrada para atualizar.", variant: "destructive" });
+        toast({ title: "Erro", description: "SessÃ£o nÃ£o encontrada para atualizar.", variant: "destructive" });
         return;
       }
       
@@ -436,7 +498,7 @@ const ActiveCashGame = () => {
       const saved = await db.cashSessions.get(id!);
       console.log("[EndSession] Verified saved session:", saved?.status, saved?.rakeFinal);
       
-      toast({ title: "Cash Game encerrado! 🏁", description: `Rake da casa: R$ ${rakeFinal.toFixed(2)}` });
+      toast({ title: "Cash Game encerrado! ðŸ", description: `Rake da casa: R$ ${rakeFinal.toFixed(2)}` });
       setEndSessionOpen(false);
       navigate("/history");
     } catch (error) {
@@ -473,7 +535,7 @@ const ActiveCashGame = () => {
         </Button>
         <div className="flex-1">
           <h2 className="text-xl text-poker-gold">{session.name}</h2>
-          <p className="text-xs text-muted-foreground">{session.blinds} • {session.gameType.replace("_", " ")}</p>
+          <p className="text-xs text-muted-foreground">{session.blinds} â€¢ {session.gameType.replace("_", " ")}</p>
         </div>
         <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20">
           <Clock className="w-3.5 h-3.5 text-primary" />
@@ -511,7 +573,7 @@ const ActiveCashGame = () => {
         {cashPlayers.length === 0 ? (
           <Card className="bg-card border-border">
             <CardContent className="p-6 text-center text-muted-foreground text-sm">
-              Nenhum jogador na mesa. Adicione jogadores para começar.
+              Nenhum jogador na mesa. Adicione jogadores para comeÃ§ar.
             </CardContent>
           </Card>
         ) : cashPlayers.map((cp) => (
@@ -528,7 +590,7 @@ const ActiveCashGame = () => {
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7"
-                    title="Ver histórico de ações"
+                    title="Ver histÃ³rico de aÃ§Ãµes"
                     onClick={() => setExpandedPlayerTx(expandedPlayerTx === cp.id ? null : cp.id)}
                   >
                     <ClipboardList className={`w-4 h-4 ${expandedPlayerTx === cp.id ? "text-primary" : "text-muted-foreground"}`} />
@@ -544,18 +606,18 @@ const ActiveCashGame = () => {
               <div className="flex items-center gap-1 text-[10px] text-muted-foreground mb-2">
                 <Clock className="w-3 h-3" />
                 <span>Entrada: {formatTime(cp.joinedAt)}</span>
-                {cp.closedAt && <span className="ml-2">• Saída: {formatTime(cp.closedAt)}</span>}
+                {cp.closedAt && <span className="ml-2">â€¢ SaÃ­da: {formatTime(cp.closedAt)}</span>}
               </div>
 
               {/* Expanded transaction history */}
               {expandedPlayerTx === cp.id && (
                 <div className="bg-muted/50 rounded-lg p-2 mb-2 space-y-1">
-                  <p className="text-[10px] font-semibold text-muted-foreground mb-1">Histórico de ações:</p>
+                  <p className="text-[10px] font-semibold text-muted-foreground mb-1">HistÃ³rico de aÃ§Ãµes:</p>
                   {(() => {
                     const playerTxs = transactions
                       .filter(t => t.cashPlayerId === cp.id)
                       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-                    if (playerTxs.length === 0) return <p className="text-[10px] text-muted-foreground">Nenhuma movimentação.</p>;
+                    if (playerTxs.length === 0) return <p className="text-[10px] text-muted-foreground">Nenhuma movimentaÃ§Ã£o.</p>;
                     return playerTxs.map(tx => {
                       const Icon = txIconMap[tx.type] ?? Clock;
                       return (
@@ -596,7 +658,7 @@ const ActiveCashGame = () => {
                   </div>
                   <div className="flex gap-1">
                     <Button size="sm" variant="outline" className="text-xs h-7 px-2" onClick={() => { setCloseTargetId(cp.id); setFinalChips(String(cp.finalChips ?? 0)); setClosePlayerOpen(true); }}>
-                      ✏️ Editar
+                      âœï¸ Editar
                     </Button>
                     <Button size="sm" variant="ghost" className="text-xs h-7 px-2" onClick={() => handleReopenPlayer(cp.id)}>
                       <RotateCcw className="w-3 h-3 mr-1" /> Reabrir
@@ -630,14 +692,14 @@ const ActiveCashGame = () => {
           <DialogHeader className="p-4 pb-0">
             <DialogTitle className="text-poker-gold flex items-center gap-2">
               <DollarSign className="w-5 h-5" />
-              Relatório de Movimento
+              RelatÃ³rio de Movimento
             </DialogTitle>
           </DialogHeader>
           <div className="overflow-y-auto max-h-[70vh] p-4 pt-2 space-y-4">
             {/* Session info */}
             <div className="text-xs text-muted-foreground">
-              <p>{session.name} • {session.blinds} • {session.gameType.replace("_", " ")}</p>
-              <p>Início: {new Date(session.startedAt).toLocaleString("pt-BR")}</p>
+              <p>{session.name} â€¢ {session.blinds} â€¢ {session.gameType.replace("_", " ")}</p>
+              <p>InÃ­cio: {new Date(session.startedAt).toLocaleString("pt-BR")}</p>
             </div>
 
             {/* Summary */}
@@ -705,7 +767,7 @@ const ActiveCashGame = () => {
             {totalReturned > totalInvested && (
               <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
                 <AlertTriangle className="w-5 h-5 text-destructive flex-shrink-0" />
-                <p className="text-sm text-destructive">Erro de conferência: valor devolvido maior que o investido.</p>
+                <p className="text-sm text-destructive">Erro de conferÃªncia: valor devolvido maior que o investido.</p>
               </div>
             )}
 
@@ -732,7 +794,7 @@ const ActiveCashGame = () => {
                       </div>
                       <div className="text-[10px] text-muted-foreground flex gap-3">
                         <span>Entrada: {new Date(cp.joinedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
-                        {cp.closedAt && <span>Saída: {new Date(cp.closedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>}
+                        {cp.closedAt && <span>SaÃ­da: {new Date(cp.closedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>}
                       </div>
                       {playerTxs.length > 0 && (
                         <div className="bg-background/50 rounded p-2 space-y-1">
@@ -901,7 +963,7 @@ const ActiveCashGame = () => {
               Resumo Financeiro
             </DialogTitle>
             <DialogDescription>
-              Recibo financeiro do jogador fechado nesta sessão.
+              Recibo financeiro do jogador fechado nesta sessÃ£o.
             </DialogDescription>
           </DialogHeader>
           {summaryPlayer && (() => {
@@ -924,14 +986,14 @@ const ActiveCashGame = () => {
                   {summaryPlayer.player?.nickname && (
                     <p className="text-xs text-muted-foreground">"{summaryPlayer.player.nickname}"</p>
                   )}
-                  <p className="text-[11px] text-muted-foreground mt-1">{session.name} • {session.blinds}</p>
+                  <p className="text-[11px] text-muted-foreground mt-1">{session.name} â€¢ {session.blinds}</p>
                 </div>
 
                 {/* Result highlight */}
                 <div className={`rounded-lg p-4 text-center ${positive ? "bg-primary/10 border border-primary/30" : "bg-destructive/10 border border-destructive/30"}`}>
                   <div className="flex items-center justify-center gap-2">
                     {positive ? <TrendingUp className="w-5 h-5 text-primary" /> : <TrendingDown className="w-5 h-5 text-destructive" />}
-                    <span className="text-xs text-muted-foreground">{positive ? "Lucro" : "Prejuízo"}</span>
+                    <span className="text-xs text-muted-foreground">{positive ? "Lucro" : "PrejuÃ­zo"}</span>
                   </div>
                   <p className={`text-2xl font-bold font-display ${positive ? "text-primary" : "text-destructive"}`}>
                     {positive ? "+" : ""}R$ {result.toFixed(2)}
@@ -958,7 +1020,7 @@ const ActiveCashGame = () => {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Entrada</span>
-                    <span>{formatTime(summaryPlayer.joinedAt)}{summaryPlayer.closedAt ? ` • Saída ${formatTime(summaryPlayer.closedAt)}` : ""}</span>
+                    <span>{formatTime(summaryPlayer.joinedAt)}{summaryPlayer.closedAt ? ` â€¢ SaÃ­da ${formatTime(summaryPlayer.closedAt)}` : ""}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Pagamento</span>
@@ -969,7 +1031,7 @@ const ActiveCashGame = () => {
                 {/* Transaction history */}
                 {playerTxs.length > 0 && (
                   <div className="bg-muted/50 rounded-lg p-2 space-y-1 max-h-40 overflow-y-auto">
-                    <p className="text-[10px] font-semibold text-muted-foreground mb-1">Movimentações</p>
+                    <p className="text-[10px] font-semibold text-muted-foreground mb-1">MovimentaÃ§Ãµes</p>
                     {playerTxs.map(tx => {
                       const Icon = txIconMap[tx.type] ?? Clock;
                       return (

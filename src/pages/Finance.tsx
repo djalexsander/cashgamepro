@@ -11,10 +11,13 @@ import { Badge } from "@/components/ui/badge";
 import {
   db,
   generateId,
+  calculateSessionFiadoBalances,
   getSessionFinanceSummary,
   payReceivable,
+  reconcileSessionFiadoBalances,
   type DBCashSession,
   type DBFinancialTransaction,
+  type PlayerFiadoBalance,
   type DBPlayer,
   type DBReceivable,
   type DBSessionExpense,
@@ -100,6 +103,7 @@ const Finance = () => {
   const [transactions, setTransactions] = useState<DBFinancialTransaction[]>([]);
   const [allTransactions, setAllTransactions] = useState<DBFinancialTransaction[]>([]);
   const [receivables, setReceivables] = useState<DBReceivable[]>([]);
+  const [fiadoCredits, setFiadoCredits] = useState<PlayerFiadoBalance[]>([]);
   const [expenses, setExpenses] = useState<DBSessionExpense[]>([]);
   const [allExpenses, setAllExpenses] = useState<DBSessionExpense[]>([]);
   const [summary, setSummary] = useState<SessionFinanceSummary>(emptySummary);
@@ -130,8 +134,10 @@ const Finance = () => {
   const load = async () => {
     setLoading(true);
     try {
-      const [allSessions, allPlayers, allReceivables, everyTransaction, everyExpense] = await Promise.all([
-        db.cashSessions.orderBy("startedAt").reverse().toArray(),
+      const allSessions = await db.cashSessions.orderBy("startedAt").reverse().toArray();
+      await Promise.all(allSessions.map(session => reconcileSessionFiadoBalances(session.id)));
+
+      const [allPlayers, allReceivables, everyTransaction, everyExpense] = await Promise.all([
         db.players.orderBy("name").toArray(),
         db.receivables.toArray(),
         db.financialTransactions.toArray(),
@@ -156,10 +162,12 @@ const Finance = () => {
         sessionExpenses.sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
         setTransactions(sessionTxs);
         setExpenses(sessionExpenses);
+        setFiadoCredits((await calculateSessionFiadoBalances(preferred)).filter(balance => balance.creditAmount > 0));
         setSummary(session ? await getSessionFinanceSummary(session) : emptySummary);
       } else {
         setTransactions([]);
         setExpenses([]);
+        setFiadoCredits([]);
         setSummary(emptySummary);
       }
     } catch (error) {
@@ -317,6 +325,7 @@ const Finance = () => {
     { label: "Debito", value: summary.debit, icon: CreditCard },
     { label: "Fiado", value: summary.fiado, icon: Receipt },
     { label: "Total a receber", value: summary.totalReceivable, icon: Receipt },
+    { label: "Clientes a pagar", value: fiadoCredits.reduce((sum, item) => sum + item.creditAmount, 0), icon: Receipt },
     { label: "Despesas", value: summary.expenses, icon: Receipt },
     { label: "Rake bruto", value: summary.rakeGross, icon: DollarSign },
     { label: "Comissao dealer", value: summary.dealerPayment, icon: DollarSign },
@@ -438,6 +447,36 @@ const Finance = () => {
                   ))}
                   {receivableGroups.length === 0 && (
                     <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">Nenhum cliente com debito em aberto.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+          <Card className="bg-card border-border">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Clientes a pagar</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="text-xs text-muted-foreground border-b border-border">
+                  <tr>
+                    <th className="p-3 text-left">Jogador</th>
+                    <th className="p-3 text-right">Credito</th>
+                    <th className="p-3 text-right">Total fiado</th>
+                    <th className="p-3 text-right">Total cashout</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {fiadoCredits.map(balance => (
+                    <tr key={`${balance.sessionId}-${balance.playerId}`} className="border-b border-border/60">
+                      <td className="p-3 font-semibold">{playerMap.get(balance.playerId)?.name ?? "Jogador"}</td>
+                      <td className="p-3 text-right font-bold">{money(balance.creditAmount)}</td>
+                      <td className="p-3 text-right">{money(balance.totalFiado)}</td>
+                      <td className="p-3 text-right">{money(balance.totalCashout)}</td>
+                    </tr>
+                  ))}
+                  {fiadoCredits.length === 0 && (
+                    <tr><td colSpan={4} className="p-6 text-center text-muted-foreground">Nenhum cliente com credito a receber do caixa.</td></tr>
                   )}
                 </tbody>
               </table>

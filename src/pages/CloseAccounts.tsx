@@ -9,7 +9,20 @@ import {
   AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
   AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction,
 } from "@/components/ui/alert-dialog";
-import { db, generateId, type DBCashSession, type DBCashPlayer, type DBPlayer, type DBTransaction, type PaymentMethod, type PaymentStatus } from "@/db/database";
+import {
+  db,
+  generateId,
+  buildPlayerFiadoCycles,
+  reconcilePlayerFiadoBalance,
+  reconcileSessionFiadoBalances,
+  type DBCashSession,
+  type DBCashPlayer,
+  type DBFinancialTransaction,
+  type DBPlayer,
+  type DBTransaction,
+  type PaymentMethod,
+  type PaymentStatus,
+} from "@/db/database";
 import { toast } from "@/hooks/use-toast";
 import { printThermalReceipt } from "@/utils/thermalReceiptPrint";
 import {
@@ -25,12 +38,29 @@ type ReceiptData = {
   result: number;
   date: string;
   session: string;
+  totalFiado: number;
+  totalCashout: number;
+  customerPays: number;
+  customerReceives: number;
+  transactions: Array<{ type: string; amount: number; paymentMethod?: string; timestamp: string }>;
+  cycles: Array<{
+    index: number;
+    startedAt: string;
+    totalInvested: number;
+    totalFiado: number;
+    totalCashout: number;
+    result: number;
+    debtAmount: number;
+    creditAmount: number;
+    transactions: Array<{ type: string; amount: number; paymentMethod?: string; timestamp: string }>;
+  }>;
 };
 
 const CloseAccounts = () => {
   const [activeSessions, setActiveSessions] = useState<DBCashSession[]>([]);
   const [cashPlayers, setCashPlayers] = useState<EnrichedCashPlayer[]>([]);
   const [transactions, setTransactions] = useState<DBTransaction[]>([]);
+  const [financialTransactions, setFinancialTransactions] = useState<DBFinancialTransaction[]>([]);
 
   // Close modal
   const [closeOpen, setCloseOpen] = useState(false);
@@ -50,6 +80,7 @@ const CloseAccounts = () => {
     try {
       const allSessions = await db.cashSessions.toArray();
       const active = allSessions.filter(s => s.status === "active");
+      await Promise.all(active.map(session => reconcileSessionFiadoBalances(session.id)));
       setActiveSessions(active);
 
       if (active.length === 0) {
@@ -83,6 +114,8 @@ const CloseAccounts = () => {
 
       const allTxs = await db.transactions.toArray();
       setTransactions(allTxs.filter(t => sessionIds.includes(t.sessionId)));
+      const allFinancialTxs = await db.financialTransactions.toArray();
+      setFinancialTransactions(allFinancialTxs.filter(t => sessionIds.includes(t.sessionId)));
     } catch (error) {
       console.error("Erro ao carregar dados:", error);
       toast({ title: "Erro", description: "Falha ao carregar dados.", variant: "destructive" });
@@ -104,9 +137,25 @@ const CloseAccounts = () => {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 
+  const txLabelMap: Record<string, string> = {
+    buyin: "Buy-in",
+    rebuy: "Rebuy",
+    addon: "Add Fichas",
+    withdrawal: "Retirada",
+    cashout: "Cash Out",
+  };
+  const paymentLabelMap: Record<string, string> = {
+    cash: "Dinheiro",
+    pix: "Pix",
+    credit: "Credito",
+    debit: "Debito",
+    fiado: "Fiado",
+    pending: "Pendente",
+  };
+
   const openCloseModal = (cp: EnrichedCashPlayer) => {
     if (!cp.isActive) {
-      toast({ title: "Atenção", description: "Este jogador já foi fechado.", variant: "destructive" });
+      toast({ title: "AtenÃ§Ã£o", description: "Este jogador jÃ¡ foi fechado.", variant: "destructive" });
       return;
     }
     setCloseTarget(cp);
@@ -123,7 +172,7 @@ const CloseAccounts = () => {
     }
     const chips = parseFloat(finalChips);
     if (chips > 50000) {
-      toast({ title: "⚠️ Valor alto", description: `Fichas finais de R$ ${chips.toFixed(2)} parecem incomuns. Confirme o valor.`, variant: "destructive" });
+      toast({ title: "âš ï¸ Valor alto", description: `Fichas finais de R$ ${chips.toFixed(2)} parecem incomuns. Confirme o valor.`, variant: "destructive" });
     }
     setConfirmOpen(true);
   };
@@ -132,7 +181,7 @@ const CloseAccounts = () => {
     console.log("[close-account] confirm start");
     if (!closeTarget) {
       toast({
-        title: "Conta não selecionada",
+        title: "Conta nÃ£o selecionada",
         description: "Selecione um jogador antes de confirmar o fechamento.",
         variant: "destructive",
       });
@@ -169,27 +218,87 @@ const CloseAccounts = () => {
       }
 
       // Record cashout transaction
-      await db.transactions.add({
+      const cashoutTx: DBTransaction = {
         id: generateId(),
         sessionId: closeTarget.sessionId,
         cashPlayerId: closeTarget.id,
         type: "cashout",
         amount: chips,
         timestamp: now,
+      };
+      await db.transactions.add(cashoutTx);
+      await reconcilePlayerFiadoBalance(closeTarget.sessionId, closeTarget.playerId);
+
+      const receiptTransactions = [...transactions, cashoutTx]
+        .filter(tx => tx.sessionId === closeTarget.sessionId)
+        .filter(tx => {
+          const owner = cashPlayers.find(cp => cp.id === tx.cashPlayerId);
+          return owner?.playerId === closeTarget.playerId || tx.cashPlayerId === closeTarget.id;
+        })
+        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      const paymentForTx = (tx: DBTransaction) => {
+        if (tx.type === "cashout" || tx.type === "withdrawal") return undefined;
+        const financialTx = financialTransactions.find(item =>
+          item.sessionId === tx.sessionId &&
+          item.playerId === closeTarget.playerId &&
+          item.type === tx.type &&
+          item.amount === tx.amount &&
+          Math.abs(new Date(item.occurredAt).getTime() - new Date(tx.timestamp).getTime()) < 2000
+        );
+        return financialTx ? paymentLabelMap[financialTx.paymentMethod] ?? financialTx.paymentMethod : undefined;
+      };
+      const playerFinancialTxs = financialTransactions.filter(tx => tx.sessionId === closeTarget.sessionId && tx.playerId === closeTarget.playerId);
+      const cycles = buildPlayerFiadoCycles({
+        sessionId: closeTarget.sessionId,
+        playerId: closeTarget.playerId,
+        transactions: receiptTransactions,
+        financialTransactions: playerFinancialTxs,
       });
+      const totalFiado = cycles.reduce((sum, cycle) => sum + cycle.totalFiado, 0);
+      const totalCashout = cycles.reduce((sum, cycle) => sum + cycle.totalCashout, 0);
+      const totalInvestedReceipt = cycles.reduce((sum, cycle) => sum + cycle.totalInvested, 0);
+      const totalResult = cycles.reduce((sum, cycle) => sum + cycle.result, 0);
+      const customerPays = cycles.reduce((sum, cycle) => sum + cycle.debtAmount, 0);
+      const customerReceives = cycles.reduce((sum, cycle) => sum + cycle.creditAmount, 0);
 
       toast({
-        title: "Conta fechada! ✅",
+        title: "Conta fechada! âœ…",
         description: `${closeTarget.player?.name ?? "Jogador"}: R$ ${result >= 0 ? "+" : ""}${result.toFixed(2)}`,
       });
 
       const nextReceiptData: ReceiptData = {
         name: closeTarget.player?.name ?? "Jogador",
-        invested: closeTarget.totalInvested,
+        invested: totalInvestedReceipt,
         finalChips: chips,
-        result,
+        result: totalResult,
         date: new Date().toLocaleString("pt-BR"),
         session: closeTarget.session?.name ?? "",
+        totalFiado,
+        totalCashout,
+        customerPays,
+        customerReceives,
+        transactions: receiptTransactions.map(tx => ({
+          type: tx.type,
+          amount: tx.amount,
+          paymentMethod: paymentForTx(tx),
+          timestamp: tx.timestamp,
+        })),
+        cycles: cycles.map(cycle => ({
+          index: cycle.index,
+          startedAt: cycle.startedAt,
+          totalInvested: cycle.totalInvested,
+          totalFiado: cycle.totalFiado,
+          totalCashout: cycle.totalCashout,
+          result: cycle.result,
+          debtAmount: cycle.debtAmount,
+          creditAmount: cycle.creditAmount,
+          transactions: cycle.transactions.map(tx => ({
+            type: tx.type,
+            amount: tx.amount,
+            paymentMethod: paymentForTx(tx),
+            timestamp: tx.timestamp,
+          })),
+        })),
       };
 
       setReceiptData(nextReceiptData);
@@ -206,7 +315,7 @@ const CloseAccounts = () => {
         description:
           error instanceof Error
             ? error.message
-            : "Não foi possível concluir o fechamento da conta.",
+            : "NÃ£o foi possÃ­vel concluir o fechamento da conta.",
         variant: "destructive",
       });
     }
@@ -214,6 +323,21 @@ const CloseAccounts = () => {
 
   const buildReceiptHtml = (data: ReceiptData | null = receiptData) => {
     if (!data) return "";
+    const cycleSections = data.cycles.map(cycle => {
+      const txRows = cycle.transactions.map(tx => (
+        `<div class="row"><span>${new Date(tx.timestamp).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} ${escapeHtml(txLabelMap[tx.type] ?? tx.type)}</span><strong>R$ ${tx.amount.toFixed(2)}${tx.paymentMethod ? ` - ${escapeHtml(tx.paymentMethod)}` : ""}</strong></div>`
+      )).join("");
+      return `<div class="sub"><b>Ciclo ${cycle.index}</b>
+        <div class="row"><span>Entrada</span><strong>${new Date(cycle.startedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</strong></div>
+        ${txRows}
+        <div class="row"><span>Total investido</span><strong>R$ ${cycle.totalInvested.toFixed(2)}</strong></div>
+        <div class="row"><span>Total fiado</span><strong>R$ ${cycle.totalFiado.toFixed(2)}</strong></div>
+        <div class="row"><span>Cashout</span><strong>R$ ${cycle.totalCashout.toFixed(2)}</strong></div>
+        <div class="row"><span>Resultado</span><strong>R$ ${cycle.result >= 0 ? "+" : ""}${cycle.result.toFixed(2)}</strong></div>
+        <div class="row"><span>Cliente paga</span><strong>R$ ${cycle.debtAmount.toFixed(2)}</strong></div>
+        <div class="row"><span>Cliente recebe</span><strong>R$ ${cycle.creditAmount.toFixed(2)}</strong></div>
+      </div>`;
+    }).join("");
 
     return `
       <!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=80mm, initial-scale=1" /><title>Recibo</title></head><body>
@@ -223,6 +347,15 @@ const CloseAccounts = () => {
         <div class="row"><span>Jogador:</span><strong>${escapeHtml(data.name)}</strong></div>
         <div class="row"><span>Investido:</span><span>R$ ${data.invested.toFixed(2)}</span></div>
         <div class="row"><span>Fichas Finais:</span><span>R$ ${data.finalChips.toFixed(2)}</span></div>
+        ${cycleSections}
+        <div class="sub"><b>Resumo final</b>
+          <div class="row"><span>Total investido</span><strong>R$ ${data.invested.toFixed(2)}</strong></div>
+          <div class="row"><span>Total fiado</span><strong>R$ ${data.totalFiado.toFixed(2)}</strong></div>
+          <div class="row"><span>Total cashout</span><strong>R$ ${data.totalCashout.toFixed(2)}</strong></div>
+          <div class="row"><span>Resultado final</span><strong>R$ ${data.result >= 0 ? "+" : ""}${data.result.toFixed(2)}</strong></div>
+          <div class="row"><span>Cliente paga</span><strong>R$ ${data.customerPays.toFixed(2)}</strong></div>
+          <div class="row"><span>Cliente recebe</span><strong>R$ ${data.customerReceives.toFixed(2)}</strong></div>
+        </div>
         <div class="result ${data.result >= 0 ? "positive" : "negative"}">
           Resultado: R$ ${data.result >= 0 ? "+" : ""}${data.result.toFixed(2)}
         </div>
@@ -240,7 +373,7 @@ const CloseAccounts = () => {
     const html = buildReceiptHtml();
     if (!html) {
       toast({
-        title: "N�o h� dados para imprimir.",
+        title: "Não há dados para imprimir.",
         description: "Feche uma conta antes de imprimir o recibo.",
         variant: "destructive",
       });
@@ -256,7 +389,7 @@ const CloseAccounts = () => {
         description:
           error instanceof Error
             ? error.message
-            : "O Desktop/Tauri ou o navegador recusou a chamada de impressão.",
+            : "O Desktop/Tauri ou o navegador recusou a chamada de impressÃ£o.",
         variant: "destructive",
       });
     }
@@ -283,7 +416,7 @@ const CloseAccounts = () => {
         <Card className="bg-card border-border">
           <CardContent className="p-8 text-center">
             <Wallet className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
-            <p className="text-muted-foreground">Nenhuma sessão ativa no momento.</p>
+            <p className="text-muted-foreground">Nenhuma sessÃ£o ativa no momento.</p>
             <p className="text-sm text-muted-foreground mt-1">Inicie um Cash Game para utilizar esta tela.</p>
           </CardContent>
         </Card>
@@ -308,7 +441,7 @@ const CloseAccounts = () => {
           <CardContent className="p-3 text-center">
             <TrendingUp className="w-4 h-4 mx-auto text-primary" />
             <p className="text-lg font-bold font-display">R$ {totalReturned.toFixed(0)}</p>
-            <p className="text-[10px] text-muted-foreground">Já Devolvido</p>
+            <p className="text-[10px] text-muted-foreground">JÃ¡ Devolvido</p>
           </CardContent>
         </Card>
         <Card className="bg-card border-border">
@@ -334,7 +467,7 @@ const CloseAccounts = () => {
         <div className="flex gap-2 flex-wrap">
           {activeSessions.map(s => (
             <span key={s.id} className="text-xs bg-muted px-2 py-1 rounded-full text-muted-foreground">
-              {s.name} • {s.blinds}
+              {s.name} â€¢ {s.blinds}
             </span>
           ))}
         </div>
@@ -345,7 +478,7 @@ const CloseAccounts = () => {
         {cashPlayers.length === 0 ? (
           <Card className="bg-card border-border">
             <CardContent className="p-6 text-center text-muted-foreground text-sm">
-              Nenhum jogador nas sessões ativas.
+              Nenhum jogador nas sessÃµes ativas.
             </CardContent>
           </Card>
         ) : cashPlayers.map((cp) => (
@@ -391,7 +524,7 @@ const CloseAccounts = () => {
                       </p>
                       <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
                         <CheckCircle2 className="w-3 h-3" />
-                        Fechado • {cp.paymentStatus === "paid" ? "Pago" : cp.paymentStatus === "received" ? "Recebido" : "Pendente"}
+                        Fechado â€¢ {cp.paymentStatus === "paid" ? "Pago" : cp.paymentStatus === "received" ? "Recebido" : "Pendente"}
                       </div>
                     </div>
                   )}
@@ -428,7 +561,7 @@ const CloseAccounts = () => {
                   <span className="font-bold">R$ {closeTarget.currentChips.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Movimentações</span>
+                  <span className="text-muted-foreground">MovimentaÃ§Ãµes</span>
                   <span>{getPlayerTxs(closeTarget.id).length}</span>
                 </div>
                 <div className="flex justify-between">
@@ -444,7 +577,7 @@ const CloseAccounts = () => {
               {/* Transaction history */}
               {getPlayerTxs(closeTarget.id).length > 0 && (
                 <div className="bg-muted/50 rounded-lg p-2 space-y-1 max-h-32 overflow-y-auto">
-                  <p className="text-[10px] text-muted-foreground font-semibold mb-1">Histórico</p>
+                  <p className="text-[10px] text-muted-foreground font-semibold mb-1">HistÃ³rico</p>
                   {getPlayerTxs(closeTarget.id).map(tx => (
                     <div key={tx.id} className="flex items-center gap-2 text-xs">
                       <span className="text-[10px] text-muted-foreground w-12 shrink-0">
@@ -478,7 +611,7 @@ const CloseAccounts = () => {
                       {(parseFloat(finalChips) - closeTarget.totalInvested).toFixed(2)}
                     </p>
                     <p className="text-xs">
-                      {parseFloat(finalChips) - closeTarget.totalInvested > 0 ? "Jogador ganhou 🎉" :
+                      {parseFloat(finalChips) - closeTarget.totalInvested > 0 ? "Jogador ganhou ðŸŽ‰" :
                        parseFloat(finalChips) - closeTarget.totalInvested < 0 ? "Jogador perdeu" : "Empate"}
                     </p>
                   </div>
@@ -559,13 +692,13 @@ const CloseAccounts = () => {
               Recibo
             </DialogTitle>
             <DialogDescription>
-              Recibo térmico 80mm da conta fechada.
+              Recibo tÃ©rmico 80mm da conta fechada.
             </DialogDescription>
           </DialogHeader>
           {receiptData && (
             <div className="space-y-3 text-sm">
               <div className="bg-muted rounded-lg p-4 space-y-2 font-mono">
-                <p className="text-center font-bold text-base">🃏 Cash Game Pro</p>
+                <p className="text-center font-bold text-base">ðŸƒ Cash Game Pro</p>
                 <p className="text-center text-xs text-muted-foreground">{receiptData.session}</p>
                 <div className="border-t border-dashed border-border my-2" />
                 <div className="flex justify-between"><span>Jogador:</span><span className="font-bold">{receiptData.name}</span></div>

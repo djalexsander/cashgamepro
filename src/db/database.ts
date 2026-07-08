@@ -123,6 +123,34 @@ export interface SessionFinanceSummary {
   fiadoReceived: number;
 }
 
+export interface PlayerFiadoBalance {
+  sessionId: string;
+  playerId: string;
+  totalFiado: number;
+  totalCashout: number;
+  paidAmount: number;
+  debtAmount: number;
+  openDebt: number;
+  creditAmount: number;
+  cycles: PlayerFiadoCycle[];
+}
+
+export interface PlayerFiadoCycle {
+  id: string;
+  sessionId: string;
+  playerId: string;
+  index: number;
+  startedAt: string;
+  endedAt?: string;
+  totalInvested: number;
+  totalFiado: number;
+  totalCashout: number;
+  result: number;
+  debtAmount: number;
+  creditAmount: number;
+  transactions: DBTransaction[];
+}
+
 // Helper: get current user id
 async function getUserId(): Promise<string> {
   const { data } = await supabase.auth.getUser();
@@ -469,10 +497,205 @@ export async function recordFinancialEntry(input: {
     };
     await db.receivables.add(receivable);
     await db.financialTransactions.update(tx.id, { receivableId: receivable.id });
+    await reconcilePlayerFiadoBalance(input.sessionId, input.playerId);
     return { ...tx, receivableId: receivable.id };
   }
 
   return tx;
+}
+
+function findMatchingFinancialTx(
+  tx: DBTransaction,
+  financialTransactions: DBFinancialTransaction[],
+): DBFinancialTransaction | undefined {
+  if (tx.type === "cashout" || tx.type === "withdrawal") return undefined;
+  return financialTransactions.find(item =>
+    item.type === tx.type &&
+    item.amount === tx.amount &&
+    Math.abs(new Date(item.occurredAt).getTime() - new Date(tx.timestamp).getTime()) < 2000
+  );
+}
+
+export function buildPlayerFiadoCycles(input: {
+  sessionId: string;
+  playerId: string;
+  transactions: DBTransaction[];
+  financialTransactions: DBFinancialTransaction[];
+}): PlayerFiadoCycle[] {
+  const cycles: PlayerFiadoCycle[] = [];
+  let current: PlayerFiadoCycle | null = null;
+
+  const startCycle = (startedAt: string) => {
+    current = {
+      id: `${input.playerId}:${cycles.length + 1}`,
+      sessionId: input.sessionId,
+      playerId: input.playerId,
+      index: cycles.length + 1,
+      startedAt,
+      totalInvested: 0,
+      totalFiado: 0,
+      totalCashout: 0,
+      result: 0,
+      debtAmount: 0,
+      creditAmount: 0,
+      transactions: [],
+    };
+  };
+
+  const finishCycle = (endedAt?: string) => {
+    if (!current) return;
+    current.endedAt = endedAt;
+    current.result = current.totalCashout - current.totalInvested;
+    current.debtAmount = Math.max(current.totalFiado - current.totalCashout, 0);
+    current.creditAmount = current.totalFiado > 0 ? Math.max(current.totalCashout - current.totalFiado, 0) : 0;
+    cycles.push(current);
+    current = null;
+  };
+
+  for (const tx of input.transactions.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())) {
+    if (!current) startCycle(tx.timestamp);
+    current!.transactions.push(tx);
+
+    if (tx.type === "buyin" || tx.type === "rebuy" || tx.type === "addon") {
+      current!.totalInvested += tx.amount;
+      const financialTx = findMatchingFinancialTx(tx, input.financialTransactions);
+      if (financialTx?.paymentMethod === "fiado") current!.totalFiado += tx.amount;
+    }
+
+    if (tx.type === "cashout") {
+      current!.totalCashout += tx.amount;
+      finishCycle(tx.timestamp);
+    }
+  }
+
+  finishCycle();
+  return cycles.filter(cycle => cycle.totalInvested > 0 || cycle.totalFiado > 0 || cycle.totalCashout > 0);
+}
+
+export async function calculatePlayerFiadoBalance(sessionId: string, playerId: string): Promise<PlayerFiadoBalance> {
+  const [financialTransactions, cashPlayers, transactions, receivables] = await Promise.all([
+    db.financialTransactions.where("sessionId").equals(sessionId).toArray(),
+    db.cashPlayers.where("sessionId").equals(sessionId).toArray(),
+    db.transactions.where("sessionId").equals(sessionId).toArray(),
+    db.receivables.where("sessionId").equals(sessionId).toArray(),
+  ]);
+
+  const playerCashPlayerIds = new Set(
+    cashPlayers
+      .filter(cp => cp.playerId === playerId)
+      .map(cp => cp.id),
+  );
+  const playerTransactions = transactions.filter(tx => playerCashPlayerIds.has(tx.cashPlayerId));
+  const playerFinancialTransactions = financialTransactions.filter(tx => tx.playerId === playerId);
+  const cycles = buildPlayerFiadoCycles({
+    sessionId,
+    playerId,
+    transactions: playerTransactions,
+    financialTransactions: playerFinancialTransactions,
+  });
+  const totalFiado = cycles.reduce((sum, cycle) => sum + cycle.totalFiado, 0);
+  const totalCashout = cycles.reduce((sum, cycle) => sum + cycle.totalCashout, 0);
+  const playerReceivables = receivables.filter(item => item.playerId === playerId);
+  const debtAmount = cycles.reduce((sum, cycle) => sum + cycle.debtAmount, 0);
+  const creditAmount = cycles.reduce((sum, cycle) => sum + cycle.creditAmount, 0);
+  const paidAmount = Math.min(
+    debtAmount,
+    playerReceivables.reduce((sum, item) => sum + item.paidAmount, 0),
+  );
+
+  return {
+    sessionId,
+    playerId,
+    totalFiado,
+    totalCashout,
+    paidAmount,
+    debtAmount,
+    openDebt: Math.max(debtAmount - paidAmount, 0),
+    creditAmount,
+    cycles,
+  };
+}
+
+export async function calculateSessionFiadoBalances(sessionId: string): Promise<PlayerFiadoBalance[]> {
+  const [financialTransactions, cashPlayers] = await Promise.all([
+    db.financialTransactions.where("sessionId").equals(sessionId).toArray(),
+    db.cashPlayers.where("sessionId").equals(sessionId).toArray(),
+  ]);
+  const playerIds = new Set<string>();
+
+  financialTransactions
+    .filter(tx => tx.paymentMethod === "fiado" && tx.playerId)
+    .forEach(tx => playerIds.add(tx.playerId!));
+  cashPlayers.forEach(cp => playerIds.add(cp.playerId));
+
+  const balances = await Promise.all([...playerIds].map(playerId => calculatePlayerFiadoBalance(sessionId, playerId)));
+  return balances.filter(balance => balance.totalFiado > 0);
+}
+
+export async function reconcilePlayerFiadoBalance(sessionId: string, playerId: string): Promise<PlayerFiadoBalance> {
+  const now = new Date().toISOString();
+  const balance = await calculatePlayerFiadoBalance(sessionId, playerId);
+  const sessionReceivables = await db.receivables.where("sessionId").equals(sessionId).toArray();
+  const playerReceivables = sessionReceivables
+    .filter(item => item.playerId === playerId)
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  const primary = playerReceivables[0];
+  const clampedPaid = Math.min(balance.debtAmount, playerReceivables.reduce((sum, item) => sum + item.paidAmount, 0));
+
+  if (!primary && balance.debtAmount > 0) {
+    await db.receivables.add({
+      id: generateId(),
+      sessionId,
+      playerId,
+      originalAmount: balance.debtAmount,
+      paidAmount: 0,
+      status: "open",
+      notes: "Saldo fiado liquido",
+      createdAt: now,
+      updatedAt: now,
+    });
+    return { ...balance, paidAmount: 0, openDebt: balance.debtAmount };
+  }
+
+  if (primary) {
+    await db.receivables.update(primary.id, {
+      originalAmount: balance.debtAmount,
+      paidAmount: clampedPaid,
+      status: clampedPaid >= balance.debtAmount ? "paid" : "open",
+      notes: "Saldo fiado liquido",
+      updatedAt: now,
+    });
+  }
+
+  for (const item of playerReceivables.slice(1)) {
+    await db.receivables.update(item.id, {
+      originalAmount: 0,
+      paidAmount: 0,
+      status: "paid",
+      updatedAt: now,
+    });
+  }
+
+  return {
+    ...balance,
+    paidAmount: clampedPaid,
+    openDebt: Math.max(balance.debtAmount - clampedPaid, 0),
+  };
+}
+
+export async function reconcileSessionFiadoBalances(sessionId: string): Promise<PlayerFiadoBalance[]> {
+  const [financialTransactions, cashPlayers] = await Promise.all([
+    db.financialTransactions.where("sessionId").equals(sessionId).toArray(),
+    db.cashPlayers.where("sessionId").equals(sessionId).toArray(),
+  ]);
+  const playerIds = new Set<string>();
+
+  financialTransactions
+    .filter(tx => tx.paymentMethod === "fiado" && tx.playerId)
+    .forEach(tx => playerIds.add(tx.playerId!));
+  cashPlayers.forEach(cp => playerIds.add(cp.playerId));
+
+  return Promise.all([...playerIds].map(playerId => reconcilePlayerFiadoBalance(sessionId, playerId)));
 }
 
 export async function payReceivable(input: {
@@ -506,10 +729,10 @@ export async function payReceivable(input: {
 }
 
 export async function getSessionFinanceSummary(session: DBCashSession): Promise<SessionFinanceSummary> {
-  const [financialTransactions, receivables, expenses] = await Promise.all([
+  const [financialTransactions, expenses, fiadoBalances] = await Promise.all([
     db.financialTransactions.where("sessionId").equals(session.id).toArray(),
-    db.receivables.where("sessionId").equals(session.id).toArray(),
     db.sessionExpenses.where("sessionId").equals(session.id).toArray(),
+    calculateSessionFiadoBalances(session.id),
   ]);
 
   const byMethod = (method: FinancialPaymentMethod) =>
@@ -532,9 +755,7 @@ export async function getSessionFinanceSummary(session: DBCashSession): Promise<
     .filter(tx => tx.paymentMethod === "debit")
     .reduce((sum, tx) => sum + tx.amount, 0);
 
-  const totalReceivable = receivables
-    .filter(item => item.status === "open")
-    .reduce((sum, item) => sum + (item.originalAmount - item.paidAmount), 0);
+  const totalReceivable = fiadoBalances.reduce((sum, item) => sum + item.openDebt, 0);
   const expensesTotal = expenses.reduce((sum, item) => sum + item.amount, 0);
   const rakeGross = Number(session.rakeFinal ?? 0);
   const dealerPercentage = Number(session.dealerPercentage ?? 0);
@@ -547,7 +768,7 @@ export async function getSessionFinanceSummary(session: DBCashSession): Promise<
     pix: pixPayments,
     credit: creditPayments,
     debit: debitPayments,
-    fiado: byMethod("fiado"),
+    fiado: totalReceivable,
     totalReceivable,
     expenses: expensesTotal,
     rakeGross,
