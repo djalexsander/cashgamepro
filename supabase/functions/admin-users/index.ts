@@ -149,7 +149,7 @@ Deno.serve(async (req) => {
         .eq("id", user_id);
       if (error) throw error;
 
-      // If blocking, also set active = false
+      // If blocking, alsó set active = false
       if (subscription_status === "blocked") {
         await supabaseAdmin.from("profiles").update({ active: false }).eq("id", user_id);
       }

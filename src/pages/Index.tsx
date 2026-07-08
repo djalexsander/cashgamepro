@@ -62,9 +62,9 @@ const Index = () => {
     switch (type) {
       case "buyin": return "Buy-in";
       case "rebuy": return "Rebuy";
-      case "addon": return "Add Fichas";
+      case "addon": return "Add-on";
       case "withdrawal": return "Retirada";
-      case "cashout": return "Cash Out";
+      case "cashout": return "Cash-out";
       default: return type;
     }
   };

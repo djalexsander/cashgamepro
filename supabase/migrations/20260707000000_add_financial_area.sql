@@ -1,4 +1,4 @@
--- Financial area for Cash Game Pro.
+-- Área financeira for Cash Game Pro.
 --
 -- This migration is intentionally aligned with the table names hardcoded in
 -- src/db/database.ts. The frontend uses:

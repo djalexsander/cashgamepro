@@ -140,22 +140,22 @@ const CloseAccounts = () => {
   const txLabelMap: Record<string, string> = {
     buyin: "Buy-in",
     rebuy: "Rebuy",
-    addon: "Add Fichas",
+    addon: "Add-on",
     withdrawal: "Retirada",
-    cashout: "Cash Out",
+    cashout: "Cash-out",
   };
   const paymentLabelMap: Record<string, string> = {
     cash: "Dinheiro",
-    pix: "Pix",
-    credit: "Credito",
-    debit: "Debito",
+    pix: "PIX",
+    credit: "Cr?dito",
+    debit: "D?bito",
     fiado: "Fiado",
     pending: "Pendente",
   };
 
   const openCloseModal = (cp: EnrichedCashPlayer) => {
     if (!cp.isActive) {
-      toast({ title: "AtenÃ§Ã£o", description: "Este jogador jÃ¡ foi fechado.", variant: "destructive" });
+      toast({ title: "Atenção", description: "Este jogador já foi fechado.", variant: "destructive" });
       return;
     }
     setCloseTarget(cp);
@@ -172,7 +172,7 @@ const CloseAccounts = () => {
     }
     const chips = parseFloat(finalChips);
     if (chips > 50000) {
-      toast({ title: "âš ï¸ Valor alto", description: `Fichas finais de R$ ${chips.toFixed(2)} parecem incomuns. Confirme o valor.`, variant: "destructive" });
+      toast({ title: "Atenção: valor alto", description: `Fichas finais de R$ ${chips.toFixed(2)} parecem incomuns. Confirme o valor.`, variant: "destructive" });
     }
     setConfirmOpen(true);
   };
@@ -181,7 +181,7 @@ const CloseAccounts = () => {
     console.log("[close-account] confirm start");
     if (!closeTarget) {
       toast({
-        title: "Conta nÃ£o selecionada",
+        title: "Conta não selecionada",
         description: "Selecione um jogador antes de confirmar o fechamento.",
         variant: "destructive",
       });
@@ -262,7 +262,7 @@ const CloseAccounts = () => {
       const customerReceives = cycles.reduce((sum, cycle) => sum + cycle.creditAmount, 0);
 
       toast({
-        title: "Conta fechada! âœ…",
+        title: "Conta fechada! ",
         description: `${closeTarget.player?.name ?? "Jogador"}: R$ ${result >= 0 ? "+" : ""}${result.toFixed(2)}`,
       });
 
@@ -315,7 +315,7 @@ const CloseAccounts = () => {
         description:
           error instanceof Error
             ? error.message
-            : "NÃ£o foi possÃ­vel concluir o fechamento da conta.",
+            : "Não foi possível concluir o fechamento da conta.",
         variant: "destructive",
       });
     }
@@ -332,7 +332,7 @@ const CloseAccounts = () => {
         ${txRows}
         <div class="row"><span>Total investido</span><strong>R$ ${cycle.totalInvested.toFixed(2)}</strong></div>
         <div class="row"><span>Total fiado</span><strong>R$ ${cycle.totalFiado.toFixed(2)}</strong></div>
-        <div class="row"><span>Cashout</span><strong>R$ ${cycle.totalCashout.toFixed(2)}</strong></div>
+        <div class="row"><span>Cash-out</span><strong>R$ ${cycle.totalCashout.toFixed(2)}</strong></div>
         <div class="row"><span>Resultado</span><strong>R$ ${cycle.result >= 0 ? "+" : ""}${cycle.result.toFixed(2)}</strong></div>
         <div class="row"><span>Cliente paga</span><strong>R$ ${cycle.debtAmount.toFixed(2)}</strong></div>
         <div class="row"><span>Cliente recebe</span><strong>R$ ${cycle.creditAmount.toFixed(2)}</strong></div>
@@ -346,12 +346,12 @@ const CloseAccounts = () => {
         <p class="center" style="font-size:0.9em;">${escapeHtml(data.session)}</p>
         <div class="row"><span>Jogador:</span><strong>${escapeHtml(data.name)}</strong></div>
         <div class="row"><span>Investido:</span><span>R$ ${data.invested.toFixed(2)}</span></div>
-        <div class="row"><span>Fichas Finais:</span><span>R$ ${data.finalChips.toFixed(2)}</span></div>
+        <div class="row"><span>Fichas finais:</span><span>R$ ${data.finalChips.toFixed(2)}</span></div>
         ${cycleSections}
         <div class="sub"><b>Resumo final</b>
           <div class="row"><span>Total investido</span><strong>R$ ${data.invested.toFixed(2)}</strong></div>
           <div class="row"><span>Total fiado</span><strong>R$ ${data.totalFiado.toFixed(2)}</strong></div>
-          <div class="row"><span>Total cashout</span><strong>R$ ${data.totalCashout.toFixed(2)}</strong></div>
+          <div class="row"><span>Total cash-out</span><strong>R$ ${data.totalCashout.toFixed(2)}</strong></div>
           <div class="row"><span>Resultado final</span><strong>R$ ${data.result >= 0 ? "+" : ""}${data.result.toFixed(2)}</strong></div>
           <div class="row"><span>Cliente paga</span><strong>R$ ${data.customerPays.toFixed(2)}</strong></div>
           <div class="row"><span>Cliente recebe</span><strong>R$ ${data.customerReceives.toFixed(2)}</strong></div>
@@ -389,7 +389,7 @@ const CloseAccounts = () => {
         description:
           error instanceof Error
             ? error.message
-            : "O Desktop/Tauri ou o navegador recusou a chamada de impressÃ£o.",
+            : "O Desktop/Tauri ou o navegador recusou a chamada de impressão.",
         variant: "destructive",
       });
     }
@@ -408,15 +408,22 @@ const CloseAccounts = () => {
     transactions
       .filter(t => t.cashPlayerId === cashPlayerId)
       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  const closeTargetTxs = closeTarget ? getPlayerTxs(closeTarget.id) : [];
+  const closeCashout = Number(finalChips) || 0;
+  const closeBuyins = closeTargetTxs.filter(tx => tx.type === "buyin").reduce((sum, tx) => sum + tx.amount, 0);
+  const closeRebuys = closeTargetTxs.filter(tx => tx.type === "rebuy").reduce((sum, tx) => sum + tx.amount, 0);
+  const closeAddons = closeTargetTxs.filter(tx => tx.type === "addon").reduce((sum, tx) => sum + tx.amount, 0);
+  const closeResult = closeTarget ? closeCashout - closeTarget.totalInvested : 0;
+  const closePaymentLabel = paymentLabelMap[closePaymentMethod] ?? closePaymentMethod;
 
   if (activeSessions.length === 0) {
     return (
       <div className="space-y-6">
-        <h2 className="text-2xl text-poker-gold">Fechar Contas</h2>
+        <h2 className="text-2xl text-poker-gold">Fechar contas</h2>
         <Card className="bg-card border-border">
           <CardContent className="p-8 text-center">
             <Wallet className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
-            <p className="text-muted-foreground">Nenhuma sessÃ£o ativa no momento.</p>
+            <p className="text-muted-foreground">Nenhuma sessão ativa no momento.</p>
             <p className="text-sm text-muted-foreground mt-1">Inicie um Cash Game para utilizar esta tela.</p>
           </CardContent>
         </Card>
@@ -426,7 +433,7 @@ const CloseAccounts = () => {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-2xl text-poker-gold">Fechar Contas</h2>
+      <h2 className="text-2xl text-poker-gold">Fechar contas</h2>
 
       {/* Financial Summary Panel */}
       <div className="grid grid-cols-2 gap-2">
@@ -434,21 +441,21 @@ const CloseAccounts = () => {
           <CardContent className="p-3 text-center">
             <DollarSign className="w-4 h-4 mx-auto text-secondary" />
             <p className="text-lg font-bold font-display text-secondary">R$ {totalInvested.toFixed(0)}</p>
-            <p className="text-[10px] text-muted-foreground">Total Investido</p>
+            <p className="text-[10px] text-muted-foreground">Total investido</p>
           </CardContent>
         </Card>
         <Card className="bg-card border-border">
           <CardContent className="p-3 text-center">
             <TrendingUp className="w-4 h-4 mx-auto text-primary" />
             <p className="text-lg font-bold font-display">R$ {totalReturned.toFixed(0)}</p>
-            <p className="text-[10px] text-muted-foreground">JÃ¡ Devolvido</p>
+            <p className="text-[10px] text-muted-foreground">Já devolvido</p>
           </CardContent>
         </Card>
         <Card className="bg-card border-border">
           <CardContent className="p-3 text-center">
             <Users className="w-4 h-4 mx-auto text-foreground" />
             <p className="text-lg font-bold font-display">{activeCount}</p>
-            <p className="text-[10px] text-muted-foreground">Em Aberto</p>
+            <p className="text-[10px] text-muted-foreground">Em aberto</p>
           </CardContent>
         </Card>
         <Card className="bg-card border-border">
@@ -457,7 +464,7 @@ const CloseAccounts = () => {
             <p className={`text-lg font-bold font-display ${rakePartial >= 0 ? "text-primary" : "text-destructive"}`}>
               R$ {rakePartial.toFixed(0)}
             </p>
-            <p className="text-[10px] text-muted-foreground">Rake Parcial</p>
+            <p className="text-[10px] text-muted-foreground">Rake parcial</p>
           </CardContent>
         </Card>
       </div>
@@ -467,7 +474,7 @@ const CloseAccounts = () => {
         <div className="flex gap-2 flex-wrap">
           {activeSessions.map(s => (
             <span key={s.id} className="text-xs bg-muted px-2 py-1 rounded-full text-muted-foreground">
-              {s.name} â€¢ {s.blinds}
+              {s.name} - {s.blinds}
             </span>
           ))}
         </div>
@@ -478,7 +485,7 @@ const CloseAccounts = () => {
         {cashPlayers.length === 0 ? (
           <Card className="bg-card border-border">
             <CardContent className="p-6 text-center text-muted-foreground text-sm">
-              Nenhum jogador nas sessÃµes ativas.
+              Nenhum jogador nas sessões ativas.
             </CardContent>
           </Card>
         ) : cashPlayers.map((cp) => (
@@ -524,7 +531,7 @@ const CloseAccounts = () => {
                       </p>
                       <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
                         <CheckCircle2 className="w-3 h-3" />
-                        Fechado â€¢ {cp.paymentStatus === "paid" ? "Pago" : cp.paymentStatus === "received" ? "Recebido" : "Pendente"}
+                        Fechado - {cp.paymentStatus === "paid" ? "Pago" : cp.paymentStatus === "received" ? "Recebido" : "Pendente"}
                       </div>
                     </div>
                   )}
@@ -541,7 +548,7 @@ const CloseAccounts = () => {
           <DialogHeader>
             <DialogTitle className="text-poker-gold flex items-center gap-2">
               <Lock className="w-5 h-5" />
-              Fechar Conta
+              Fechar conta
             </DialogTitle>
           </DialogHeader>
           {closeTarget && (
@@ -553,15 +560,15 @@ const CloseAccounts = () => {
                   <span className="font-semibold">{closeTarget.player?.name}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Total Investido</span>
+                  <span className="text-muted-foreground">Total investido</span>
                   <span className="font-bold text-secondary">R$ {closeTarget.totalInvested.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Fichas Atuais</span>
+                  <span className="text-muted-foreground">Fichas atuais</span>
                   <span className="font-bold">R$ {closeTarget.currentChips.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">MovimentaÃ§Ãµes</span>
+                  <span className="text-muted-foreground">Movimentações</span>
                   <span>{getPlayerTxs(closeTarget.id).length}</span>
                 </div>
                 <div className="flex justify-between">
@@ -577,14 +584,14 @@ const CloseAccounts = () => {
               {/* Transaction history */}
               {getPlayerTxs(closeTarget.id).length > 0 && (
                 <div className="bg-muted/50 rounded-lg p-2 space-y-1 max-h-32 overflow-y-auto">
-                  <p className="text-[10px] text-muted-foreground font-semibold mb-1">HistÃ³rico</p>
+                  <p className="text-[10px] text-muted-foreground font-semibold mb-1">Histórico</p>
                   {getPlayerTxs(closeTarget.id).map(tx => (
                     <div key={tx.id} className="flex items-center gap-2 text-xs">
                       <span className="text-[10px] text-muted-foreground w-12 shrink-0">
                         {new Date(tx.timestamp).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                       </span>
                       <span className="flex-1">
-                        {tx.type === "buyin" ? "Buy-in" : tx.type === "rebuy" ? "Rebuy" : tx.type === "addon" ? "Add" : tx.type === "withdrawal" ? "Retirada" : "Cash Out"}
+                        {tx.type === "buyin" ? "Buy-in" : tx.type === "rebuy" ? "Rebuy" : tx.type === "addon" ? "Add-on" : tx.type === "withdrawal" ? "Retirada" : "Cash-out"}
                       </span>
                       <span className="font-bold">R$ {tx.amount.toFixed(2)}</span>
                     </div>
@@ -594,7 +601,7 @@ const CloseAccounts = () => {
 
               {/* Final chips */}
               <div className="space-y-2">
-                <Label className="font-semibold">Fichas Finais Devolvidas (R$) *</Label>
+                <Label className="font-semibold">Fichas finais devolvidas (R$) *</Label>
                 <Input
                   type="number"
                   value={finalChips}
@@ -611,7 +618,7 @@ const CloseAccounts = () => {
                       {(parseFloat(finalChips) - closeTarget.totalInvested).toFixed(2)}
                     </p>
                     <p className="text-xs">
-                      {parseFloat(finalChips) - closeTarget.totalInvested > 0 ? "Jogador ganhou ðŸŽ‰" :
+                      {parseFloat(finalChips) - closeTarget.totalInvested > 0 ? "Jogador ganhou" :
                        parseFloat(finalChips) - closeTarget.totalInvested < 0 ? "Jogador perdeu" : "Empate"}
                     </p>
                   </div>
@@ -628,7 +635,7 @@ const CloseAccounts = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="cash">Dinheiro</SelectItem>
-                      <SelectItem value="pix">Pix</SelectItem>
+                      <SelectItem value="pix">PIX</SelectItem>
                       <SelectItem value="pending">Pendente</SelectItem>
                     </SelectContent>
                   </Select>
@@ -641,7 +648,7 @@ const CloseAccounts = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="paid">Pago</SelectItem>
-                      <SelectItem value="pending">A Pagar</SelectItem>
+                      <SelectItem value="pending">A pagar</SelectItem>
                       <SelectItem value="received">Recebido</SelectItem>
                     </SelectContent>
                   </Select>
@@ -652,7 +659,7 @@ const CloseAccounts = () => {
           <DialogFooter>
             <Button variant="outline" onClick={() => setCloseOpen(false)}>Cancelar</Button>
             <Button onClick={handlePrepareClose} variant="destructive" className="gap-1">
-              <Lock className="w-4 h-4" /> Fechar Conta
+              <Lock className="w-4 h-4" /> Fechar conta
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -662,22 +669,26 @@ const CloseAccounts = () => {
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent className="bg-card border-border">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-poker-gold">Confirmar Fechamento</AlertDialogTitle>
+            <AlertDialogTitle className="text-poker-gold">Confirmar fechamento</AlertDialogTitle>
             <AlertDialogDescription>
-              Fechar a conta de <span className="font-bold text-foreground">{closeTarget?.player?.name}</span> com fichas finais de{" "}
-              <span className="font-bold text-foreground">R$ {parseFloat(finalChips || "0").toFixed(2)}</span>?
-              {closeTarget && (
-                <span className={`block mt-2 text-base font-bold ${parseFloat(finalChips || "0") - closeTarget.totalInvested >= 0 ? "text-primary" : "text-destructive"}`}>
-                  Resultado: R$ {(parseFloat(finalChips || "0") - closeTarget.totalInvested) >= 0 ? "+" : ""}
-                  {(parseFloat(finalChips || "0") - closeTarget.totalInvested).toFixed(2)}
-                </span>
-              )}
+              Revise os valores antes de fechar a conta. Nada será gravado até a confirmação.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {closeTarget && (
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between"><span className="text-muted-foreground">Jogador</span><strong>{closeTarget.player?.name ?? "Jogador"}</strong></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Buy-ins</span><span>R$ {closeBuyins.toFixed(2)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Rebuys</span><span>R$ {closeRebuys.toFixed(2)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Add-ons</span><span>R$ {closeAddons.toFixed(2)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Cash-out</span><strong>R$ {closeCashout.toFixed(2)}</strong></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Resultado</span><strong>R$ {closeResult >= 0 ? "+" : ""}{closeResult.toFixed(2)}</strong></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Pagamento</span><span>{closePaymentLabel}</span></div>
+            </div>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmClose} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Confirmar
+              Confirmar fechamento
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -692,18 +703,18 @@ const CloseAccounts = () => {
               Recibo
             </DialogTitle>
             <DialogDescription>
-              Recibo tÃ©rmico 80mm da conta fechada.
+              Recibo térmico 80mm da conta fechada.
             </DialogDescription>
           </DialogHeader>
           {receiptData && (
             <div className="space-y-3 text-sm">
               <div className="bg-muted rounded-lg p-4 space-y-2 font-mono">
-                <p className="text-center font-bold text-base">ðŸƒ Cash Game Pro</p>
+                <p className="text-center font-bold text-base"> Cash Game Pro</p>
                 <p className="text-center text-xs text-muted-foreground">{receiptData.session}</p>
                 <div className="border-t border-dashed border-border my-2" />
                 <div className="flex justify-between"><span>Jogador:</span><span className="font-bold">{receiptData.name}</span></div>
                 <div className="flex justify-between"><span>Investido:</span><span>R$ {receiptData.invested.toFixed(2)}</span></div>
-                <div className="flex justify-between"><span>Fichas Finais:</span><span>R$ {receiptData.finalChips.toFixed(2)}</span></div>
+                <div className="flex justify-between"><span>Fichas finais:</span><span>R$ {receiptData.finalChips.toFixed(2)}</span></div>
                 <div className="border-t border-dashed border-border my-2" />
                 <div className={`text-center text-xl font-bold ${receiptData.result >= 0 ? "text-primary" : "text-destructive"}`}>
                   R$ {receiptData.result >= 0 ? "+" : ""}{receiptData.result.toFixed(2)}

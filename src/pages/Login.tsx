@@ -47,7 +47,7 @@ const Login = () => {
           variant: "destructive",
         });
       } else if (isSignUp) {
-        toast({ title: "Conta criada!", description: "Verifique seu email para confirmar." });
+        toast({ title: "Conta criada!", description: "Verifique seu e-mail para confirmar." });
       } else {
         if (rememberMe) {
           localStorage.setItem("poker_remember_email", email);
@@ -76,7 +76,7 @@ const Login = () => {
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
-      toast({ title: "Informe seu email", variant: "destructive" });
+      toast({ title: "Informe seu e-mail", variant: "destructive" });
       return;
     }
     setLoading(true);
@@ -88,7 +88,7 @@ const Login = () => {
         toast({ title: "Erro", description: error.message, variant: "destructive" });
       } else {
         setResetSent(true);
-        toast({ title: "Email enviado!", description: "Verifique sua caixa de entrada." });
+        toast({ title: "E-mail enviado!", description: "Verifique sua caixa de entrada." });
       }
     } catch (error) {
       console.error("[password-reset] error", error);
@@ -124,7 +124,7 @@ const Login = () => {
               <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-medium text-destructive font-sans normal-case tracking-normal">
-                  Acesso bloqueado por inadimplência
+                  Acessó bloqueado por inadimplência
                 </p>
                 <p className="text-xs text-muted-foreground mt-1 font-sans normal-case tracking-normal">
                   Sua mensalidade está vencida. Entre em contato com o administrador para regularizar seu acesso.
@@ -177,7 +177,7 @@ const Login = () => {
                     <Mail className="w-8 h-8 text-primary" />
                   </div>
                   <h3 className="text-lg font-semibold font-sans normal-case tracking-normal">
-                    Email enviado!
+                    E-mail enviado!
                   </h3>
                   <p className="text-sm text-muted-foreground font-sans normal-case tracking-normal">
                     Enviamos um link de recuperação para <strong>{email}</strong>. Verifique sua caixa de entrada e spam.
@@ -187,7 +187,7 @@ const Login = () => {
                     className="w-full"
                     onClick={() => { setResetSent(false); }}
                   >
-                    Reenviar email
+                    Reenviar e-mail
                   </Button>
                 </div>
               ) : (
@@ -196,7 +196,7 @@ const Login = () => {
                     Recuperar senha
                   </h3>
                   <p className="text-sm text-muted-foreground text-center font-sans normal-case tracking-normal">
-                    Informe seu email para receber o link de recuperação.
+                    Informe seu e-mail para receber o link de recuperação.
                   </p>
                   <Input
                     type="email"
@@ -287,7 +287,7 @@ const Login = () => {
                   {loading ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
                   ) : isSignUp ? (
-                    "Criar Conta"
+                    "Criar conta"
                   ) : (
                     "Entrar"
                   )}

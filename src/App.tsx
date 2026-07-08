@@ -38,7 +38,7 @@ const AppContent = () => {
         description:
           event.reason instanceof Error
             ? event.reason.message
-            : "Veja o console para o detalhe técnico do erro.",
+            : "Veja o console para o detalhe t?cnico do erro.",
         variant: "destructive",
       });
       event.preventDefault();
@@ -57,7 +57,7 @@ const AppContent = () => {
         description:
           event.error instanceof Error
             ? event.error.message
-            : "Veja o console para o detalhe técnico do erro.",
+            : "Veja o console para o detalhe t?cnico do erro.",
         variant: "destructive",
       });
     };

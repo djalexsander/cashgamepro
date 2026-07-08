@@ -50,7 +50,7 @@ pub fn list_printers() -> Result<Vec<PrinterInfo>, String> {
   let output = Command::new("lpstat")
     .args(["-p", "-d"])
     .output()
-    .map_err(|e| format!("lpstat indisponivel (CUPS): {e}"))?;
+    .map_err(|e| format!("lpstat indisponível (CUPS): {e}"))?;
 
   if !output.status.success() {
     return Err(format!(
@@ -106,7 +106,7 @@ pub fn print_raw(printer_name: &str, _doc_name: &str, data: &[u8]) -> Result<Str
     .stdout(std::process::Stdio::piped())
     .stderr(std::process::Stdio::piped())
     .spawn()
-    .map_err(|e| format!("lp indisponivel: {e}"))?;
+    .map_err(|e| format!("lp indisponível: {e}"))?;
 
   if let Some(stdin) = child.stdin.as_mut() {
     stdin.write_all(data).map_err(|e| format!("write: {e}"))?;

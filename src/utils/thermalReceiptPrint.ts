@@ -31,7 +31,7 @@ const parseReceipt = (html: string) => {
   const receipt = printDoc.querySelector(".receipt") as HTMLElement | null;
 
   if (!receipt) {
-    throw new Error("Elemento .receipt nao encontrado no HTML de impressao.");
+    throw new Error("Elemento .receipt não encontrado no HTML de impressão.");
   }
 
   return receipt;
@@ -191,7 +191,7 @@ const printWithBrowserPreview = async (receipt: HTMLElement) => {
 
   const iframe = document.createElement("iframe");
   iframe.id = PRINT_FRAME_ID;
-  iframe.title = "Recibo termico";
+  iframe.title = "Recibo térmico";
   iframe.style.position = "fixed";
   iframe.style.left = "0";
   iframe.style.top = "0";
@@ -205,7 +205,7 @@ const printWithBrowserPreview = async (receipt: HTMLElement) => {
 
   const printWindow = iframe.contentWindow;
   const printDocument = iframe.contentDocument;
-  if (!printWindow || !printDocument) throw new Error("Nao foi possivel criar a area de impressao.");
+  if (!printWindow || !printDocument) throw new Error("Não foi possível criar a área de impressão.");
 
   const write = (heightMm?: number) => {
     printDocument.open();
@@ -244,7 +244,7 @@ const printWithBrowserPreview = async (receipt: HTMLElement) => {
 
 export const printThermalReceipt = async ({ html, logPrefix = "[thermal-print]" }: ThermalPrintOptions) => {
   if (printInProgress) {
-    throw new Error("Ja existe uma impressao em andamento. Aguarde concluir para tentar novamente.");
+    throw new Error("Já existe uma impressão em andamento. Aguarde concluir para tentar novamente.");
   }
 
   printInProgress = true;
@@ -256,7 +256,7 @@ export const printThermalReceipt = async ({ html, logPrefix = "[thermal-print]" 
     if (isDesktop()) {
       const printer = getReceiptPrinter();
       if (!printer) {
-        throw new Error("Nenhuma impressora configurada. Abra Configuracoes > Impressao e selecione a impressora padrao.");
+        throw new Error("Nenhuma impressora configurada. Abra Configurações > Impressão e selecione a impressora padrão.");
       }
 
       const widthMm = getReceiptWidthMm();
@@ -267,8 +267,8 @@ export const printThermalReceipt = async ({ html, logPrefix = "[thermal-print]" 
     }
 
     toast({
-      title: "Impressao via navegador",
-      description: "No app desktop, configure uma impressora para impressao direta.",
+      title: "Impressão via navegador",
+      description: "No app desktop, configure uma impressora para impressão direta.",
     });
     await printWithBrowserPreview(receipt);
   } catch (error) {

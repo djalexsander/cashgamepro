@@ -26,9 +26,9 @@ const formatDateTime = (iso: string) => `${formatDate(iso)} ${formatTime(iso)}`;
 const txLabel: Record<string, string> = {
   buyin: "Buy-in",
   rebuy: "Rebuy",
-  addon: "Add Fichas",
+  addon: "Add-on",
   withdrawal: "Retirada",
-  cashout: "Cash Out",
+  cashout: "Cash-out",
 };
 
 const txIcon: Record<string, typeof LogIn> = {
@@ -236,7 +236,7 @@ const HistoryPage = () => {
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="h-9 text-xs justify-start font-normal font-sans normal-case tracking-normal">
                     <CalendarIcon className="w-3 h-3 mr-1" />
-                    {filterDateFrom ? format(filterDateFrom, "dd/MM/yy", { locale: ptBR }) : "Data início"}
+                    {filterDateFrom ? format(filterDateFrom, "dd/MM/yy", { locale: ptBR }) : "Data in?cio"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -336,8 +336,8 @@ const HistoryPage = () => {
                   {[
                     { label: "Jogadores", value: detail.players.length, icon: Users, color: "text-foreground" },
                     { label: "Rake da Casa", value: `R$ ${(detail.session.rakeFinal ?? 0).toFixed(2)}`, icon: DollarSign, color: "text-primary" },
-                    { label: "Total Investido", value: `R$ ${(detail.session.totalInvested ?? 0).toFixed(2)}`, icon: TrendingUp, color: "text-secondary" },
-                    { label: "Total Devolvido", value: `R$ ${(detail.session.totalReturned ?? 0).toFixed(2)}`, icon: TrendingDown, color: "text-muted-foreground" },
+                    { label: "Total investido", value: `R$ ${(detail.session.totalInvested ?? 0).toFixed(2)}`, icon: TrendingUp, color: "text-secondary" },
+                    { label: "Total devolvido", value: `R$ ${(detail.session.totalReturned ?? 0).toFixed(2)}`, icon: TrendingDown, color: "text-muted-foreground" },
                   ].map((s, i) => (
                     <div key={i} className="bg-muted rounded-lg p-3 text-center">
                       <s.icon className={`w-4 h-4 mx-auto mb-1 ${s.color}`} />
@@ -409,7 +409,7 @@ const HistoryPage = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir sessão?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação não pode ser desfeita. Todos os dados desta sessão serão removidos permanentemente.
+              Esta ação não pode ser desfeita. Todos os dados destá sessão serão removidos permanentemente.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

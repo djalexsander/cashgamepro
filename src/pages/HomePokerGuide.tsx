@@ -95,7 +95,7 @@ const HomePokerGuide = () => {
               Toda partida bem-sucedida começa com regras claras combinadas antes da
               primeira mão. Defina o valor do buy-in mínimo e máximo, o blind da mesa,
               a política de recompras (rebuys) e, principalmente, como será cobrado o
-              rake. Deixar isso decidido evita discussões justamente no momento mais
+              rake. Deixar issó decidido evita discussões justamente no momento mais
               sensível: o acerto de contas.
             </p>
             <ul className="space-y-2">
@@ -162,7 +162,7 @@ const HomePokerGuide = () => {
 
           <Card className="bg-primary/10 border-primary/30">
             <CardContent className="p-6 space-y-4 text-center">
-              <h2 className="text-2xl text-poker-gold">Organize tudo isso automaticamente</h2>
+              <h2 className="text-2xl text-poker-gold">Organize tudo issó automaticamente</h2>
               <p className="text-muted-foreground">
                 O Cash Game Pro controla buy-ins, rake, fichas e pagamentos em tempo
                 real e gera o fechamento de cada jogador para você. Pare de anotar em

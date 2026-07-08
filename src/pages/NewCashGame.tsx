@@ -48,7 +48,7 @@ const NewCashGame = () => {
 
     const dealerPct = parseFloat(dealerPercentage || "0");
     if (Number.isNaN(dealerPct) || dealerPct < 0 || dealerPct > 100) {
-      toast({ title: "Percentual invalido", description: "Informe uma porcentagem do dealer entre 0 e 100.", variant: "destructive" });
+      toast({ title: "Percentual inv?lido", description: "Informe uma porcentagem do dealer entre 0 e 100.", variant: "destructive" });
       return;
     }
 

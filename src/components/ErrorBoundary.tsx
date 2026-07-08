@@ -41,7 +41,7 @@ class ErrorBoundary extends Component<Props, State> {
         <div className="min-h-screen flex items-center justify-center bg-background p-6">
           <div className="max-w-md w-full text-center space-y-4">
             <div className="w-16 h-16 mx-auto rounded-full bg-destructive/20 flex items-center justify-center">
-              <span className="text-3xl">⚠️</span>
+              <span className="text-3xl">!</span>
             </div>
             <h1 className="text-xl font-bold text-foreground">Falha ao renderizar a tela</h1>
             <p className="text-sm text-muted-foreground">
@@ -52,20 +52,20 @@ class ErrorBoundary extends Component<Props, State> {
                 onClick={this.handleReload}
                 className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
               >
-                Recarregar p�gina
+                Recarregar página
               </button>
               <button
                 onClick={this.handleReset}
                 className="px-4 py-2 rounded-md bg-muted text-muted-foreground text-sm font-medium hover:bg-muted/80 transition-colors"
               >
-                Tentar Novamente
+                Tentar novamente
               </button>
             </div>
             <button
               onClick={() => this.setState(prev => ({ showDebug: !prev.showDebug }))}
               className="text-xs text-muted-foreground underline"
             >
-              {this.state.showDebug ? "Ocultar detalhes" : "Mostrar detalhes técnicos"}
+              {this.state.showDebug ? "Ocultar detalhes" : "Mostrar detalhes t?cnicos"}
             </button>
             {this.state.showDebug && this.state.error && (
               <div className="mt-2 p-3 rounded-md bg-muted text-left overflow-auto max-h-40">

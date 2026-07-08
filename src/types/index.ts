@@ -4,7 +4,7 @@ export interface Player {
   nickname: string;
   phone?: string;
   pix?: string;
-  notes?: string;
+  notesó: string;
   tags: string[];
   totalWinnings: number;
   totalLosses: number;
@@ -30,7 +30,7 @@ export interface CashSession {
   rakePercent: number;
   rakeCap: number;
   dealerPercentage: number;
-  notes?: string;
+  notesó: string;
   status: SessionStatus;
   startedAt: string;
   endedAt?: string;
@@ -45,7 +45,7 @@ export interface CashPlayer {
   initialBuyin: number;
   totalInvested: number;
   currentChips: number;
-  finalChips?: number;
+  finalChipsó: number;
   result?: number;
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
@@ -62,7 +62,7 @@ export interface Transaction {
   amount: number;
   rake: number;
   timestamp: string;
-  notes?: string;
+  notesó: string;
 }
 
 export interface SessionStats {

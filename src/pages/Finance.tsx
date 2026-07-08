@@ -54,16 +54,16 @@ const fromDateTimeLocal = (value: string) => value ? new Date(value).toISOString
 
 const paymentLabels: Record<FinancialPaymentMethod, string> = {
   cash: "Dinheiro",
-  pix: "Pix",
-  credit: "Credito",
-  debit: "Debito",
+  pix: "PIX",
+  credit: "Crédito",
+  debit: "Débito",
   fiado: "Fiado",
 };
 
 const txLabels: Record<string, string> = {
   buyin: "Buy-in",
   rebuy: "Rebuy",
-  addon: "Addon",
+  addon: "Add-on",
   settlement: "Acerto",
   fiado_payment: "Pagamento de fiado",
   manual_adjustment: "Ajuste manual",
@@ -71,9 +71,9 @@ const txLabels: Record<string, string> = {
 
 const expenseLabels: Record<ExpenseCategory, string> = {
   dealer: "Dealer",
-  food: "Alimentacao",
+  food: "Alimentação",
   drinks: "Bebidas",
-  staff: "Funcionarios",
+  staff: "Funcionários",
   cleaning: "Limpeza",
   rent: "Aluguel",
   other: "Outros",
@@ -252,7 +252,7 @@ const Finance = () => {
     if (!paymentGroup) return;
     let remaining = Number(paymentAmount);
     if (!remaining || remaining <= 0 || remaining > paymentGroup.totalOpen) {
-      toast({ title: "Valor invalido", description: "Informe um valor maior que zero e menor ou igual ao saldo aberto.", variant: "destructive" });
+      toast({ title: "Valor inválido", description: "Informe um valor maior que zero e menor ou igual ao saldo aberto.", variant: "destructive" });
       return;
     }
     try {
@@ -286,7 +286,7 @@ const Finance = () => {
     if (!selectedSession) return;
     const amount = Number(expenseAmount);
     if (!amount || amount <= 0) {
-      toast({ title: "Valor invalido", description: "Informe o valor da despesa.", variant: "destructive" });
+      toast({ title: "Valor inválido", description: "Informe o valor da despesa.", variant: "destructive" });
       return;
     }
     try {
@@ -313,24 +313,24 @@ const Finance = () => {
 
   const deleteExpense = async (expense: DBSessionExpense) => {
     await db.sessionExpenses.delete(expense.id);
-    toast({ title: "Despesa excluida" });
+    toast({ title: "Despesa excluída" });
     await load();
   };
 
   const cards = [
     { label: "Recebido total", value: summary.receivedTotal, icon: DollarSign },
     { label: "Dinheiro", value: summary.cash, icon: Banknote },
-    { label: "Pix", value: summary.pix, icon: WalletCards },
-    { label: "Credito", value: summary.credit, icon: CreditCard },
-    { label: "Debito", value: summary.debit, icon: CreditCard },
+    { label: "PIX", value: summary.pix, icon: WalletCards },
+    { label: "Crédito", value: summary.credit, icon: CreditCard },
+    { label: "Débito", value: summary.debit, icon: CreditCard },
     { label: "Fiado", value: summary.fiado, icon: Receipt },
     { label: "Total a receber", value: summary.totalReceivable, icon: Receipt },
     { label: "Clientes a pagar", value: fiadoCredits.reduce((sum, item) => sum + item.creditAmount, 0), icon: Receipt },
     { label: "Despesas", value: summary.expenses, icon: Receipt },
     { label: "Rake bruto", value: summary.rakeGross, icon: DollarSign },
-    { label: "Comissao dealer", value: summary.dealerPayment, icon: DollarSign },
-    { label: "Rake liquido", value: summary.houseRakeNet, icon: DollarSign },
-    { label: "Resultado liquido", value: summary.netResult, icon: DollarSign },
+    { label: "Comissão dealer", value: summary.dealerPayment, icon: DollarSign },
+    { label: "Rake líquido", value: summary.houseRakeNet, icon: DollarSign },
+    { label: "Resultado líquido", value: summary.netResult, icon: DollarSign },
   ];
 
   return (
@@ -338,11 +338,11 @@ const Finance = () => {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl text-poker-gold">Financeiro</h2>
-          <p className="text-xs text-muted-foreground">Controle da sessao, contas a receber, despesas e resumo mensal.</p>
+          <p className="text-xs text-muted-foreground">Controle da sessão, contas a receber, despesas e resumo mensal.</p>
         </div>
         <Select value={selectedSessionId} onValueChange={setSelectedSessionId}>
           <SelectTrigger className="bg-muted border-border sm:w-72">
-            <SelectValue placeholder="Selecione uma sessao" />
+            <SelectValue placeholder="Selecione uma sessão" />
           </SelectTrigger>
           <SelectContent>
             {sessions.map(session => (
@@ -394,7 +394,7 @@ const Finance = () => {
                     <th className="p-3 text-left">Tipo</th>
                     <th className="p-3 text-right">Valor</th>
                     <th className="p-3 text-left">Forma</th>
-                    <th className="p-3 text-left">Observacao</th>
+                    <th className="p-3 text-left">Observação</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -428,9 +428,9 @@ const Finance = () => {
                   <tr>
                     <th className="p-3 text-left">Jogador</th>
                     <th className="p-3 text-right">Total em aberto</th>
-                    <th className="p-3 text-left">Ultimo debito</th>
-                    <th className="p-3 text-left">Sessao de origem</th>
-                    <th className="p-3 text-right">Acoes</th>
+                    <th className="p-3 text-left">Último débito</th>
+                    <th className="p-3 text-left">Sessão de origem</th>
+                    <th className="p-3 text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -446,7 +446,7 @@ const Finance = () => {
                     </tr>
                   ))}
                   {receivableGroups.length === 0 && (
-                    <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">Nenhum cliente com debito em aberto.</td></tr>
+                    <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">Nenhum cliente com débito em aberto.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -461,9 +461,9 @@ const Finance = () => {
                 <thead className="text-xs text-muted-foreground border-b border-border">
                   <tr>
                     <th className="p-3 text-left">Jogador</th>
-                    <th className="p-3 text-right">Credito</th>
+                    <th className="p-3 text-right">Crédito</th>
                     <th className="p-3 text-right">Total fiado</th>
-                    <th className="p-3 text-right">Total cashout</th>
+                    <th className="p-3 text-right">Total cash-out</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -476,7 +476,7 @@ const Finance = () => {
                     </tr>
                   ))}
                   {fiadoCredits.length === 0 && (
-                    <tr><td colSpan={4} className="p-6 text-center text-muted-foreground">Nenhum cliente com credito a receber do caixa.</td></tr>
+                    <tr><td colSpan={4} className="p-6 text-center text-muted-foreground">Nenhum cliente com crédito a receber do caixa.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -495,7 +495,7 @@ const Finance = () => {
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <Badge variant="outline">{expenseLabels[expense.category]}</Badge>
-                      <span className="font-semibold">{expense.description || "Sem descricao"}</span>
+                      <span className="font-semibold">{expense.description || "Sem descrição"}</span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">{dateTime(expense.occurredAt)}</p>
                   </div>
@@ -506,7 +506,7 @@ const Finance = () => {
               </Card>
             ))}
             {expenses.length === 0 && (
-              <Card className="bg-card border-border"><CardContent className="p-6 text-center text-muted-foreground">Nenhuma despesa nesta sessao.</CardContent></Card>
+              <Card className="bg-card border-border"><CardContent className="p-6 text-center text-muted-foreground">Nenhuma despesa nesta sessão.</CardContent></Card>
             )}
           </div>
         </TabsContent>
@@ -525,24 +525,24 @@ const Finance = () => {
             {[
               ["Total recebido", monthlySummary.receivedTotal],
               ["Dinheiro", monthlySummary.cash],
-              ["Pix", monthlySummary.pix],
-              ["Credito", monthlySummary.credit],
-              ["Debito", monthlySummary.debit],
+              ["PIX", monthlySummary.pix],
+              ["Crédito", monthlySummary.credit],
+              ["Débito", monthlySummary.debit],
               ["Fiado gerado", monthlySummary.fiadoGenerated],
               ["Fiado recebido", monthlySummary.fiadoReceived],
               ["Total em aberto", monthlySummary.totalReceivable],
               ["Rake bruto", monthlySummary.rakeGross],
-              ["Comissao dealer", monthlySummary.dealerPayment],
-              ["Rake liquido", monthlySummary.houseRakeNet],
+              ["Comissão dealer", monthlySummary.dealerPayment],
+              ["Rake líquido", monthlySummary.houseRakeNet],
               ["Despesas", monthlySummary.expenses],
-              ["Resultado liquido", monthlySummary.netResult],
-              ["Sessoes", monthlySummary.sessionsCount],
+              ["Resultado líquido", monthlySummary.netResult],
+              ["Sessões", monthlySummary.sessionsCount],
             ].map(([label, value]) => (
               <Card key={String(label)} className="bg-card border-border">
                 <CardContent className="p-3">
                   <CalendarDays className="w-4 h-4 text-primary mb-1" />
                   <p className="text-[10px] text-muted-foreground">{label}</p>
-                  <p className="text-base font-bold font-display">{typeof value === "number" && label !== "Sessoes" ? money(value) : value}</p>
+                  <p className="text-base font-bold font-display">{typeof value === "number" && label !== "Sessões" ? money(value) : value}</p>
                 </CardContent>
               </Card>
             ))}
@@ -567,14 +567,14 @@ const Finance = () => {
                 <SelectTrigger className="bg-muted border-border"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="cash">Dinheiro</SelectItem>
-                  <SelectItem value="pix">Pix</SelectItem>
-                  <SelectItem value="credit">Credito</SelectItem>
-                  <SelectItem value="debit">Debito</SelectItem>
+                  <SelectItem value="pix">PIX</SelectItem>
+                  <SelectItem value="credit">Crédito</SelectItem>
+                  <SelectItem value="debit">Débito</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Observacao</Label>
+              <Label>Observação</Label>
               <Textarea value={paymentNotes} onChange={(e) => setPaymentNotes(e.target.value)} className="bg-muted border-border" />
             </div>
           </div>
@@ -601,7 +601,7 @@ const Finance = () => {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Descricao</Label>
+              <Label>Descrição</Label>
               <Input value={expenseDescription} onChange={(e) => setExpenseDescription(e.target.value)} className="bg-muted border-border" />
             </div>
             <div className="space-y-2">

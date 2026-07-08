@@ -282,7 +282,7 @@ function getPayloadConfigFromPayload(config: ChartConfig, payload: unknown, key:
 
   const payloadPayload =
     "payload" in payload && typeof payload.payload === "object" && payload.payload !== null
-      ? payload.payload
+      - payload.payload
       : undefined;
 
   let configLabelKey: string = key;
@@ -297,7 +297,7 @@ function getPayloadConfigFromPayload(config: ChartConfig, payload: unknown, key:
     configLabelKey = payloadPayload[key as keyof typeof payloadPayload] as string;
   }
 
-  return configLabelKey in config ? config[configLabelKey] : config[key as keyof typeof config];
+  return configLabelKey in config - config[configLabelKey] : config[key as keyof typeof config];
 }
 
 export { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, ChartStyle };

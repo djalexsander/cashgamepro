@@ -99,7 +99,7 @@ const CashGames = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir sessão encerrada?</AlertDialogTitle>
-            <AlertDialogDescription>Todos os dados de jogadores e transações desta sessão serão removidos permanentemente.</AlertDialogDescription>
+            <AlertDialogDescription>Todos os dados de jogadores e transações destá sessão serão removidos permanentemente.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>

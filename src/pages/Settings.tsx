@@ -42,7 +42,7 @@ const Settings = () => {
       console.error("[settings] printers error", error);
       toast({
         title: "Falha ao listar impressoras",
-        description: error instanceof Error ? error.message : "Nao foi possivel consultar o sistema operacional.",
+        description: error instanceof Error ? error.message : "Não foi possível consultar o sistema operacional.",
         variant: "destructive",
       });
     } finally {
@@ -58,7 +58,7 @@ const Settings = () => {
     if (!selectedPrinter) {
       toast({
         title: "Selecione uma impressora",
-        description: "Escolha a impressora que recebera os recibos do Cash Game Pro.",
+        description: "Escolha a impressora que receber? os recibos do Cash Game Pro.",
         variant: "destructive",
       });
       return;
@@ -68,7 +68,7 @@ const Settings = () => {
     setReceiptWidthMm(widthMm);
     toast({
       title: "Impressora salva",
-      description: `Recibos serao enviados diretamente para "${selectedPrinter}".`,
+      description: `Recibos serão enviados diretamente para "${selectedPrinter}".`,
     });
   };
 
@@ -79,8 +79,8 @@ const Settings = () => {
           <SettingsIcon className="w-5 h-5 text-primary" />
         </div>
         <div>
-          <h2 className="text-2xl text-poker-gold">Configuracoes</h2>
-          <p className="text-sm text-muted-foreground">Preferencias locais deste computador.</p>
+          <h2 className="text-2xl text-poker-gold">Configurações</h2>
+          <p className="text-sm text-muted-foreground">Preferências locais deste computador.</p>
         </div>
       </div>
 
@@ -90,10 +90,10 @@ const Settings = () => {
             <div>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Printer className="w-5 h-5 text-primary" />
-                Impressao
+                Impressão
               </CardTitle>
               <CardDescription>
-                Configure a impressora termica que recebera os recibos sem abrir preview.
+                Configure a impressora térmica que receber? os recibos sem abrir preview.
               </CardDescription>
             </div>
             <Button type="button" variant="outline" onClick={() => void loadPrinters()} disabled={loading}>
@@ -105,12 +105,12 @@ const Settings = () => {
         <CardContent className="space-y-5">
           {!isDesktop() && (
             <div className="rounded-md border border-secondary/40 bg-secondary/10 px-3 py-2 text-sm text-secondary">
-              Impressao direta esta disponivel no aplicativo desktop. No navegador, o sistema usa o dialogo padrao.
+              Impressão direta está disponível no aplicativo desktop. No navegador, o sistema usa o diálogo padrão.
             </div>
           )}
 
           <div className="grid gap-2">
-            <Label>Impressora padrao do app</Label>
+            <Label>Impressora padrão do app</Label>
             <Select value={selectedPrinter} onValueChange={setSelectedPrinter} disabled={loading || printers.length === 0}>
               <SelectTrigger className="bg-muted border-border">
                 <SelectValue placeholder={loading ? "Carregando impressoras..." : "Selecione uma impressora"} />
@@ -119,7 +119,7 @@ const Settings = () => {
                 {printers.map((printer) => (
                   <SelectItem key={printer.name} value={printer.name}>
                     {printer.name}
-                    {printer.is_thermal ? " - termica" : printer.is_default ? " - padrao do Windows" : ""}
+                    {printer.is_thermal ? " - térmica" : printer.is_default ? " - padrão do Windows" : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -145,8 +145,8 @@ const Settings = () => {
           {selectedInfo && (
             <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/50 p-3 text-sm">
               <span className="font-medium">{selectedInfo.name}</span>
-              {selectedInfo.is_thermal && <Badge>Termica</Badge>}
-              {selectedInfo.is_default && <Badge variant="secondary">Padrao do SO</Badge>}
+              {selectedInfo.is_thermal && <Badge>T?rmica</Badge>}
+              {selectedInfo.is_default && <Badge variant="secondary">Padrão do SO</Badge>}
               {selectedInfo.status && <span className="text-muted-foreground">{selectedInfo.status}</span>}
             </div>
           )}

@@ -23,8 +23,8 @@ const navItems = [
   { to: "/close-accounts", icon: Wallet, label: "Fechar" },
   { to: "/finance", icon: WalletCards, label: "Financeiro" },
   { to: "/players", icon: Users, label: "Jogadores" },
-  { to: "/history", icon: History, label: "Historico" },
-  { to: "/settings", icon: Settings, label: "Config." },
+  { to: "/history", icon: History, label: "Histórico" },
+  { to: "/settings", icon: Settings, label: "Configurações" },
 ];
 
 const Layout = () => {
@@ -33,7 +33,7 @@ const Layout = () => {
 
   const handleLogout = async () => {
     await signOut();
-    toast({ title: "Logout realizado", description: "Ate logo!" });
+    toast({ title: "Logout realizado", description: "At? logo!" });
   };
 
   return (
@@ -66,7 +66,7 @@ const Layout = () => {
                 }
               >
                 <UserCog className="w-3 h-3" />
-                Usuarios
+                Usu?rios
               </NavLink>
               <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-sans normal-case tracking-normal">
                 <Shield className="w-3 h-3" />

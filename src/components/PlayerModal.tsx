@@ -19,7 +19,7 @@ const PlayerModal = ({ open, onOpenChange, onPlayerCreated, editPlayer }: Player
   const [name, setName] = useState(editPlayer?.name ?? "");
   const [nickname, setNickname] = useState(editPlayer?.nickname ?? "");
   const [phone, setPhone] = useState(editPlayer?.phone ?? "");
-  const [pix, setPix] = useState(editPlayer?.pix ?? "");
+  const [pix, setPIX] = useState(editPlayer?.pix ?? "");
   const [notes, setNotes] = useState(editPlayer?.notes ?? "");
   const [saving, setSaving] = useState(false);
 
@@ -28,7 +28,7 @@ const PlayerModal = ({ open, onOpenChange, onPlayerCreated, editPlayer }: Player
     setName(editPlayer?.name ?? "");
     setNickname(editPlayer?.nickname ?? "");
     setPhone(editPlayer?.phone ?? "");
-    setPix(editPlayer?.pix ?? "");
+    setPIX(editPlayer?.pix ?? "");
     setNotes(editPlayer?.notes ?? "");
   }, [open, editPlayer]);
 
@@ -82,7 +82,7 @@ const PlayerModal = ({ open, onOpenChange, onPlayerCreated, editPlayer }: Player
   };
 
   const resetForm = () => {
-    setName(""); setNickname(""); setPhone(""); setPix(""); setNotes("");
+    setName(""); setNickname(""); setPhone(""); setPIX(""); setNotes("");
   };
 
   return (
@@ -91,7 +91,7 @@ const PlayerModal = ({ open, onOpenChange, onPlayerCreated, editPlayer }: Player
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-poker-gold">
             <UserPlus className="w-5 h-5" />
-            {editPlayer ? "Editar Jogador" : "Novo Jogador"}
+            {editPlayer ? "Editar jogador" : "Novo jogador"}
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
@@ -109,8 +109,8 @@ const PlayerModal = ({ open, onOpenChange, onPlayerCreated, editPlayer }: Player
               <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(99) 99999-9999" className="bg-muted border-border" />
             </div>
             <div className="space-y-2">
-              <Label>Pix</Label>
-              <Input value={pix} onChange={(e) => setPix(e.target.value)} placeholder="Chave Pix" className="bg-muted border-border" />
+              <Label>PIX</Label>
+              <Input value={pix} onChange={(e) => setPIX(e.target.value)} placeholder="Chave PIX" className="bg-muted border-border" />
             </div>
           </div>
           <div className="space-y-2">

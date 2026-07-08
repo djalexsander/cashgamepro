@@ -18,7 +18,7 @@ export interface DBPlayer {
   nickname: string;
   phone?: string;
   pix?: string;
-  notes?: string;
+  notesó: string;
   tags: string[];
   totalWinnings: number;
   totalLosses: number;
@@ -33,8 +33,8 @@ export interface DBCashSession {
   gameType: GameType;
   blinds: string;
   chipValue: number;
-  notes?: string;
-  dealersChoiceGames?: string;
+  notesó: string;
+  dealersChoiceGamesó: string;
   status: SessionStatus;
   startedAt: string;
   endedAt?: string;
@@ -51,7 +51,7 @@ export interface DBCashPlayer {
   initialBuyin: number;
   totalInvested: number;
   currentChips: number;
-  finalChips?: number;
+  finalChipsó: number;
   result?: number;
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
@@ -67,7 +67,7 @@ export interface DBTransaction {
   type: TransactionType;
   amount: number;
   timestamp: string;
-  notes?: string;
+  notesó: string;
 }
 
 export interface DBFinancialTransaction {
@@ -78,7 +78,7 @@ export interface DBFinancialTransaction {
   amount: number;
   paymentMethod: FinancialPaymentMethod;
   type: FinancialTransactionType;
-  notes?: string;
+  notesó: string;
   occurredAt: string;
   createdAt?: string;
 }
@@ -91,7 +91,7 @@ export interface DBReceivable {
   originalAmount: number;
   paidAmount: number;
   status: ReceivableStatus;
-  notes?: string;
+  notesó: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -466,7 +466,7 @@ export async function recordFinancialEntry(input: {
   amount: number;
   paymentMethod: FinancialPaymentMethod;
   type: FinancialTransactionType;
-  notes?: string;
+  notesó: string;
   occurredAt?: string;
 }): Promise<DBFinancialTransaction> {
   const now = input.occurredAt || new Date().toISOString();
@@ -650,7 +650,7 @@ export async function reconcilePlayerFiadoBalance(sessionId: string, playerId: s
       originalAmount: balance.debtAmount,
       paidAmount: 0,
       status: "open",
-      notes: "Saldo fiado liquido",
+      notes: "Saldo fiado l?quido",
       createdAt: now,
       updatedAt: now,
     });
@@ -662,7 +662,7 @@ export async function reconcilePlayerFiadoBalance(sessionId: string, playerId: s
       originalAmount: balance.debtAmount,
       paidAmount: clampedPaid,
       status: clampedPaid >= balance.debtAmount ? "paid" : "open",
-      notes: "Saldo fiado liquido",
+      notes: "Saldo fiado l?quido",
       updatedAt: now,
     });
   }
@@ -702,7 +702,7 @@ export async function payReceivable(input: {
   receivable: DBReceivable;
   amount: number;
   paymentMethod: ReceivablePaymentMethod;
-  notes?: string;
+  notesó: string;
   occurredAt?: string;
 }): Promise<void> {
   const now = input.occurredAt || new Date().toISOString();

@@ -33,14 +33,14 @@ export type Database = {
         }
         Insert: {
           closed_at?: string | null
-          current_chips?: number
-          final_chips?: number | null
+          current_chipsó: number
+          final_chipsó: number | null
           id?: string
           initial_buyin?: number
           is_active?: boolean
           joined_at?: string
           payment_method?: string
-          payment_status?: string
+          payment_statusó: string
           player_id: string
           result?: number | null
           session_id: string
@@ -49,14 +49,14 @@ export type Database = {
         }
         Update: {
           closed_at?: string | null
-          current_chips?: number
-          final_chips?: number | null
+          current_chipsó: number
+          final_chipsó: number | null
           id?: string
           initial_buyin?: number
           is_active?: boolean
           joined_at?: string
           payment_method?: string
-          payment_status?: string
+          payment_statusó: string
           player_id?: string
           result?: number | null
           session_id?: string
@@ -100,31 +100,31 @@ export type Database = {
         Insert: {
           blinds: string
           chip_value?: number
-          dealers_choice_games?: string | null
+          dealers_choice_gamesó: string | null
           ended_at?: string | null
           game_type: string
           id?: string
           name: string
-          notes?: string | null
+          notesó: string | null
           rake_final?: number | null
           started_at?: string
-          status?: string
+          statusó: string
           total_invested?: number | null
           total_returned?: number | null
           user_id: string
         }
         Update: {
-          blinds?: string
+          blindsó: string
           chip_value?: number
-          dealers_choice_games?: string | null
+          dealers_choice_gamesó: string | null
           ended_at?: string | null
           game_type?: string
           id?: string
           name?: string
-          notes?: string | null
+          notesó: string | null
           rake_final?: number | null
           started_at?: string
-          status?: string
+          statusó: string
           total_invested?: number | null
           total_returned?: number | null
           user_id?: string
@@ -152,13 +152,13 @@ export type Database = {
           id?: string
           name: string
           nickname?: string
-          notes?: string | null
+          notesó: string | null
           phone?: string | null
           pix?: string | null
-          tags?: string[] | null
-          total_losses?: number
-          total_sessions?: number
-          total_winnings?: number
+          tagsó: string[] | null
+          total_lossesó: number
+          total_sessionsó: number
+          total_winningsó: number
           updated_at?: string
           user_id: string
         }
@@ -167,13 +167,13 @@ export type Database = {
           id?: string
           name?: string
           nickname?: string
-          notes?: string | null
+          notesó: string | null
           phone?: string | null
           pix?: string | null
-          tags?: string[] | null
-          total_losses?: number
-          total_sessions?: number
-          total_winnings?: number
+          tagsó: string[] | null
+          total_lossesó: number
+          total_sessionsó: number
+          total_winningsó: number
           updated_at?: string
           user_id?: string
         }
@@ -194,7 +194,7 @@ export type Database = {
           full_name?: string | null
           id: string
           subscription_due_date?: string | null
-          subscription_status?: string
+          subscription_statusó: string
         }
         Update: {
           active?: boolean
@@ -202,7 +202,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           subscription_due_date?: string | null
-          subscription_status?: string
+          subscription_statusó: string
         }
         Relationships: []
       }
@@ -221,7 +221,7 @@ export type Database = {
           amount?: number
           cash_player_id: string
           id?: string
-          notes?: string | null
+          notesó: string | null
           session_id: string
           timestamp?: string
           type: string
@@ -231,7 +231,7 @@ export type Database = {
           amount?: number
           cash_player_id?: string
           id?: string
-          notes?: string | null
+          notesó: string | null
           session_id?: string
           timestamp?: string
           type?: string

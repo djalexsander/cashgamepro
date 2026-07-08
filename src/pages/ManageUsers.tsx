@@ -86,7 +86,7 @@ const ManageUsers = () => {
   const handleToggleActive = async (user: AppUser) => {
     try {
       await toggleActive(user.id, !user.active);
-      toast({ title: user.active ? "Usuário desativado" : "Usuário reativado" });
+      toast({ title: user.active ? "Usu?rio desativado" : "Usu?rio reativado" });
     } catch (err: any) {
       toast({ title: "Erro", description: err.message, variant: "destructive" });
     }
@@ -350,12 +350,12 @@ const ManageUsers = () => {
                             <AlertDialogContent>
                               <AlertDialogHeader>
                                 <AlertDialogTitle className="font-sans normal-case tracking-normal">
-                                  {u.active ? "Desativar Usuário" : "Reativar Usuário"}
+                                  {u.active ? "Desativar usu?rio" : "Reativar usu?rio"}
                                 </AlertDialogTitle>
                                 <AlertDialogDescription>
                                   {u.active
                                     ? `${u.email} não poderá mais acessar o sistema.`
-                                    : `${u.email} terá acesso ao sistema novamente.`}
+                                    : `${u.email} terá acessó ao sistema novamente.`}
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
