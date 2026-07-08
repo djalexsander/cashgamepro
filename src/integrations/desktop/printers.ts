@@ -1,4 +1,4 @@
-export interface PrinterInfo {
+﻿export interface PrinterInfo {
   name: string;
   status: string | null;
   is_default: boolean;
@@ -76,7 +76,7 @@ export const printReceiptText = async (
 ) => {
   const invoke = await getInvoke();
   if (!invoke) {
-    throw new Error("Impressao direta so esta disponivel no app desktop.");
+    throw new Error("ImpressÃ£o direta sÃ³ estÃ¡ disponÃ­vel no app desktop.");
   }
 
   return invoke<string>("print_receipt_text", {
@@ -86,3 +86,5 @@ export const printReceiptText = async (
     cut: options.cut ?? true,
   });
 };
+
+
