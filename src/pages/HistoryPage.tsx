@@ -13,7 +13,8 @@ import {
   History, DollarSign, Users, Clock, ChevronRight, Filter, CalendarIcon, X,
   TrendingUp, TrendingDown, ArrowUpCircle, ArrowDownCircle, RotateCcw, LogIn, LogOut, Trash2
 } from "lucide-react";
-import { db, deleteSessionFinancialData, type DBCashSession, type DBCashPlayer, type DBPlayer, type DBTransaction } from "@/db/database";
+import { db, deleteSessionFinancialData, type DBCashSession, type DBCashPlayer, type DBPlayer, type DBTransaction, type DBFinancialTransaction } from "@/db/database";
+import { buildPlayerFinancialCycles, calculatePlayerFinancialSummary } from "@/lib/finance-calculator";
 import Seo from "@/components/Seo";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -43,6 +44,7 @@ interface SessionDetail {
   session: DBCashSession;
   players: (DBCashPlayer & { player?: DBPlayer })[];
   transactions: DBTransaction[];
+  financialTransactions: DBFinancialTransaction[];
 }
 
 const HistoryPage = () => {
@@ -119,8 +121,9 @@ const HistoryPage = () => {
     const playerMap = new Map(players.map(p => [p.id, p]));
     const enriched = cps.map(cp => ({ ...cp, player: playerMap.get(cp.playerId) }));
     const txs = await db.transactions.where("sessionId").equals(session.id).toArray();
+    const ftxs = await db.financialTransactions.where("sessionId").equals(session.id).toArray();
     txs.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-    setDetail({ session, players: enriched, transactions: txs });
+    setDetail({ session, players: enriched, transactions: txs, financialTransactions: ftxs });
     setDetailOpen(true);
   };
 
@@ -332,20 +335,26 @@ const HistoryPage = () => {
                   <p>Duração: {duration(detail.session)}</p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { label: "Jogadores", value: detail.players.length, icon: Users, color: "text-foreground" },
-                    { label: "Rake da Casa", value: `R$ ${(detail.session.rakeFinal ?? 0).toFixed(2)}`, icon: DollarSign, color: "text-primary" },
-                    { label: "Total investido", value: `R$ ${(detail.session.totalInvested ?? 0).toFixed(2)}`, icon: TrendingUp, color: "text-secondary" },
-                    { label: "Total devolvido", value: `R$ ${(detail.session.totalReturned ?? 0).toFixed(2)}`, icon: TrendingDown, color: "text-muted-foreground" },
-                  ].map((s, i) => (
-                    <div key={i} className="bg-muted rounded-lg p-3 text-center">
-                      <s.icon className={`w-4 h-4 mx-auto mb-1 ${s.color}`} />
-                      <p className="text-xs text-muted-foreground">{s.label}</p>
-                      <p className="text-sm font-bold font-display">{s.value}</p>
+                {(() => {
+                  const totalInvested = detail.players.reduce((sum, cp) => sum + cp.totalInvested, 0);
+                  const totalReturned = detail.players.reduce((sum, cp) => sum + (cp.finalChips ?? 0), 0);
+                  return (
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { label: "Jogadores", value: detail.players.length, icon: Users, color: "text-foreground" },
+                        { label: "Rake da Casa", value: `R$ ${(detail.session.rakeFinal ?? 0).toFixed(2)}`, icon: DollarSign, color: "text-primary" },
+                        { label: "Total investido", value: `R$ ${totalInvested.toFixed(2)}`, icon: TrendingUp, color: "text-secondary" },
+                        { label: "Total devolvido", value: `R$ ${totalReturned.toFixed(2)}`, icon: TrendingDown, color: "text-muted-foreground" },
+                      ].map((s, i) => (
+                        <div key={i} className="bg-muted rounded-lg p-3 text-center">
+                          <s.icon className={`w-4 h-4 mx-auto mb-1 ${s.color}`} />
+                          <p className="text-xs text-muted-foreground">{s.label}</p>
+                          <p className="text-sm font-bold font-display">{s.value}</p>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  );
+                })()}
 
                 <Separator />
 
@@ -353,7 +362,18 @@ const HistoryPage = () => {
                   <h4 className="text-sm font-semibold text-poker-gold mb-2">Resultados por Jogador</h4>
                   <div className="space-y-2">
                     {detail.players.map(cp => {
-                      const playerTxs = detail.transactions.filter(t => t.cashPlayerId === cp.id);
+                      const playerCashPlayerIds = detail.players
+                        .filter(player => player.playerId === cp.playerId)
+                        .map(player => player.id);
+                      const playerTxs = detail.transactions.filter(t => playerCashPlayerIds.includes(t.cashPlayerId));
+                      const playerFinancialTxs = detail.financialTransactions.filter(ftx => ftx.playerId === cp.playerId);
+                      const cycles = buildPlayerFinancialCycles({
+                        sessionId: detail.session.id,
+                        playerId: cp.playerId,
+                        transactions: playerTxs,
+                        financialTransactions: playerFinancialTxs,
+                      });
+                      const summary = calculatePlayerFinancialSummary(cycles);
                       return (
                         <Card key={cp.id} className="bg-muted/50 border-border">
                           <CardContent className="p-3 space-y-2">
@@ -363,10 +383,10 @@ const HistoryPage = () => {
                                 {cp.player?.nickname && <p className="text-[10px] text-muted-foreground">"{cp.player.nickname}"</p>}
                               </div>
                               <div className="text-right">
-                                <p className={`text-sm font-bold ${(cp.result ?? 0) >= 0 ? "text-primary" : "text-destructive"}`}>
-                                  {(cp.result ?? 0) >= 0 ? "+" : ""}R$ {(cp.result ?? 0).toFixed(2)}
+                                <p className={`text-sm font-bold ${summary.result >= 0 ? "text-primary" : "text-destructive"}`}>
+                                  {summary.result >= 0 ? "+" : ""}R$ {summary.result.toFixed(2)}
                                 </p>
-                                <p className="text-[10px] text-muted-foreground">Investido: R$ {cp.totalInvested.toFixed(2)}</p>
+                                <p className="text-[10px] text-muted-foreground">Investido: R$ {summary.totalInvested.toFixed(2)}</p>
                               </div>
                             </div>
 

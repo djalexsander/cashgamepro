@@ -233,7 +233,7 @@ const Finance = () => {
   useEffect(() => { if (selectedSessionId) void load(); }, [selectedSessionId]);
 
   const filteredTransactions = transactions.filter(tx => filterMethod === "all" || tx.paymentMethod === filterMethod);
-  const openReceivables = receivables.filter(item => item.status === "open" && item.originalAmount > item.paidAmount);
+  const openReceivables = receivables.filter(item => item.status === "open" && item.originalAmount > item.paidAmount && (!selectedSessionId || item.sessionId === selectedSessionId));
   const receivableGroups = useMemo<ReceivableGroup[]>(() => {
     const groups = new Map<string, DBReceivable[]>();
     for (const item of openReceivables) {
@@ -266,6 +266,7 @@ const Finance = () => {
     const sessionIds = new Set(monthSessions.map(s => s.id));
     const monthTxs = allTransactions.filter(tx => inMonth(tx.occurredAt));
     const sessionExpenses = allExpenses.filter(expense => sessionIds.has(expense.sessionId));
+    const sessionReceivables = receivables.filter(item => sessionIds.has(item.sessionId) && item.status === "open");
     const rakeGross = monthSessions.reduce((sum, s) => sum + Number(s.rakeFinal ?? 0), 0);
     const dealerPayment = monthSessions.reduce((sum, s) => sum + (Number(s.rakeFinal ?? 0) * Number(s.dealerPercentage ?? 0) / 100), 0);
     const expenseTotal = sessionExpenses.reduce((sum, expense) => sum + expense.amount, 0);
@@ -281,7 +282,7 @@ const Finance = () => {
       fiado: fiadoGenerated,
       fiadoGenerated,
       fiadoReceived: monthTxs.filter(tx => tx.type === "fiado_payment").reduce((sum, tx) => sum + tx.amount, 0),
-      totalReceivable: openReceivables.reduce((sum, item) => sum + item.originalAmount - item.paidAmount, 0),
+      totalReceivable: sessionReceivables.reduce((sum, item) => sum + item.originalAmount - item.paidAmount, 0),
       expenses: expenseTotal,
       rakeGross,
       dealerPayment,
@@ -289,7 +290,7 @@ const Finance = () => {
       netResult: rakeGross - dealerPayment - expenseTotal,
       sessionsCount: monthSessions.length,
     };
-  }, [month, year, sessions, openReceivables, allTransactions, allExpenses]);
+  }, [month, year, sessions, receivables, allTransactions, allExpenses]);
 
   const openPayment = (group: ReceivableGroup) => {
     setPaymentGroup(group);

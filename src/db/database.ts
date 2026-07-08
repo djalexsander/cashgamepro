@@ -562,7 +562,11 @@ export async function calculatePlayerFiadoBalance(sessionId: string, playerId: s
   const totalCashout = cycles.reduce((sum, cycle) => sum + cycle.totalCashout, 0);
   const playerReceivables = receivables.filter(item => item.playerId === playerId);
   const debtAmount = cycles.reduce((sum, cycle) => sum + cycle.debtAmount, 0);
-  const creditAmount = cycles.reduce((sum, cycle) => sum + cycle.creditAmount, 0);
+  const rawCreditAmount = cycles.reduce((sum, cycle) => sum + cycle.creditAmount, 0);
+  const settlementPaid = playerFinancialTransactions
+    .filter(item => item.type === "settlement")
+    .reduce((sum, item) => sum + item.amount, 0);
+  const creditAmount = Math.max(rawCreditAmount - settlementPaid, 0);
   const paidAmount = Math.min(
     debtAmount,
     playerReceivables.reduce((sum, item) => sum + item.paidAmount, 0),

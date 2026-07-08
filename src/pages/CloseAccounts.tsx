@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,6 @@ import {
 import {
   db,
   generateId,
-  buildPlayerFiadoCycles,
   reconcilePlayerFiadoBalance,
   reconcileSessionFiadoBalances,
   type DBCashSession,
@@ -23,6 +22,7 @@ import {
   type PaymentMethod,
   type PaymentStatus,
 } from "@/db/database";
+import { buildPlayerFinancialCycles, calculatePlayerFinancialSummary } from "@/lib/finance-calculator";
 import { toast } from "@/hooks/use-toast";
 import { printThermalReceipt } from "@/utils/thermalReceiptPrint";
 import {
@@ -190,7 +190,23 @@ const CloseAccounts = () => {
     const chips = parseFloat(finalChips);
 
     try {
-      const result = chips - closeTarget.totalInvested;
+      const playerCashPlayerIds = new Set(
+        cashPlayers.filter(cp => cp.playerId === closeTarget.playerId).map(cp => cp.id)
+      );
+      playerCashPlayerIds.add(closeTarget.id);
+      const playerTxs = transactions
+        .filter(tx => playerCashPlayerIds.has(tx.cashPlayerId))
+        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      const playerFinancialTxs = financialTransactions.filter(tx => tx.playerId === closeTarget.playerId);
+      const cycles = buildPlayerFiadoCycles({
+        sessionId: closeTarget.sessionId,
+        playerId: closeTarget.playerId,
+        transactions: playerTxs,
+        financialTransactions: playerFinancialTxs,
+      });
+      const summary = calculatePlayerFinancialSummary(cycles);
+      const invested = summary.totalInvested;
+      const result = chips - invested;
       const now = new Date().toISOString();
 
       await db.cashPlayers.update(closeTarget.id, {
@@ -199,6 +215,7 @@ const CloseAccounts = () => {
         isActive: false,
         closedAt: now,
         currentChips: chips,
+        totalInvested: invested,
         paymentMethod: closePaymentMethod,
         paymentStatus: closePaymentStatus,
       });
@@ -247,19 +264,20 @@ const CloseAccounts = () => {
         );
         return financialTx ? paymentLabelMap[financialTx.paymentMethod] ?? financialTx.paymentMethod : undefined;
       };
-      const playerFinancialTxs = financialTransactions.filter(tx => tx.sessionId === closeTarget.sessionId && tx.playerId === closeTarget.playerId);
-      const cycles = buildPlayerFiadoCycles({
+      const receiptFinancialTxs = financialTransactions.filter(tx => tx.sessionId === closeTarget.sessionId && tx.playerId === closeTarget.playerId);
+      const receiptCycles = buildPlayerFiadoCycles({
         sessionId: closeTarget.sessionId,
         playerId: closeTarget.playerId,
         transactions: receiptTransactions,
-        financialTransactions: playerFinancialTxs,
+        financialTransactions: receiptFinancialTxs,
       });
-      const totalFiado = cycles.reduce((sum, cycle) => sum + cycle.totalFiado, 0);
-      const totalCashout = cycles.reduce((sum, cycle) => sum + cycle.totalCashout, 0);
-      const totalInvestedReceipt = cycles.reduce((sum, cycle) => sum + cycle.totalInvested, 0);
-      const totalResult = cycles.reduce((sum, cycle) => sum + cycle.result, 0);
-      const customerPays = cycles.reduce((sum, cycle) => sum + cycle.debtAmount, 0);
-      const customerReceives = cycles.reduce((sum, cycle) => sum + cycle.creditAmount, 0);
+      const receiptSummary = calculatePlayerFinancialSummary(receiptCycles);
+      const totalFiado = receiptSummary.totalFiado;
+      const totalCashout = receiptSummary.totalCashout;
+      const totalInvestedReceipt = receiptSummary.totalInvested;
+      const totalResult = receiptSummary.result;
+      const customerPays = receiptSummary.clientPays;
+      const customerReceives = receiptSummary.clientReceives;
 
       toast({
         title: "Conta fechada! ",
@@ -413,7 +431,34 @@ const CloseAccounts = () => {
   const closeBuyins = closeTargetTxs.filter(tx => tx.type === "buyin").reduce((sum, tx) => sum + tx.amount, 0);
   const closeRebuys = closeTargetTxs.filter(tx => tx.type === "rebuy").reduce((sum, tx) => sum + tx.amount, 0);
   const closeAddons = closeTargetTxs.filter(tx => tx.type === "addon").reduce((sum, tx) => sum + tx.amount, 0);
-  const closeResult = closeTarget ? closeCashout - closeTarget.totalInvested : 0;
+  const closeSummary = useMemo(() => {
+    if (!closeTarget) {
+      return {
+        totalInvested: 0,
+        totalFiado: 0,
+        totalCashout: 0,
+        result: 0,
+        clientPays: 0,
+        clientReceives: 0,
+      };
+    }
+    const playerCashPlayerIds = new Set(
+      cashPlayers.filter(cp => cp.playerId === closeTarget.playerId).map(cp => cp.id)
+    );
+    playerCashPlayerIds.add(closeTarget.id);
+    const playerTxs = transactions
+      .filter(tx => playerCashPlayerIds.has(tx.cashPlayerId))
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    const playerFinancialTxs = financialTransactions.filter(tx => tx.playerId === closeTarget.playerId);
+    const cycles = buildPlayerFinancialCycles({
+      sessionId: closeTarget.sessionId,
+      playerId: closeTarget.playerId,
+      transactions: playerTxs,
+      financialTransactions: playerFinancialTxs,
+    });
+    return calculatePlayerFinancialSummary(cycles);
+  }, [closeTarget, cashPlayers, transactions, financialTransactions]);
+  const closeResult = closeTarget ? closeCashout - closeSummary.totalInvested : 0;
   const closePaymentLabel = paymentLabelMap[closePaymentMethod] ?? closePaymentMethod;
 
   if (activeSessions.length === 0) {
@@ -561,7 +606,7 @@ const CloseAccounts = () => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Total investido</span>
-                  <span className="font-bold text-secondary">R$ {closeTarget.totalInvested.toFixed(2)}</span>
+                  <span className="font-bold text-secondary">R$ {closeSummary.totalInvested.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Fichas atuais</span>
@@ -611,15 +656,13 @@ const CloseAccounts = () => {
                   autoFocus
                 />
                 {finalChips && parseFloat(finalChips) >= 0 && (
-                  <div className={`text-center p-2 rounded-lg ${parseFloat(finalChips) - closeTarget.totalInvested >= 0 ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"}`}>
+                  <div className={`text-center p-2 rounded-lg ${closeResult >= 0 ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"}`}>
                     <p className="text-xs text-muted-foreground">Resultado</p>
                     <p className="text-xl font-bold font-display">
-                      R$ {(parseFloat(finalChips) - closeTarget.totalInvested) >= 0 ? "+" : ""}
-                      {(parseFloat(finalChips) - closeTarget.totalInvested).toFixed(2)}
+                      R$ {closeResult >= 0 ? "+" : ""}{closeResult.toFixed(2)}
                     </p>
                     <p className="text-xs">
-                      {parseFloat(finalChips) - closeTarget.totalInvested > 0 ? "Jogador ganhou" :
-                       parseFloat(finalChips) - closeTarget.totalInvested < 0 ? "Jogador perdeu" : "Empate"}
+                      {closeResult > 0 ? "Jogador ganhou" : closeResult < 0 ? "Jogador perdeu" : "Empate"}
                     </p>
                   </div>
                 )}

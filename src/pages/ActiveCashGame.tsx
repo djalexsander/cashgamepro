@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,6 @@ import {
 import {
   db,
   generateId,
-  buildPlayerFiadoCycles,
   getSessionFinanceSummary,
   recordFinancialEntry,
   reconcilePlayerFiadoBalance,
@@ -27,6 +26,7 @@ import {
   type PaymentMethod,
   type SessionFinanceSummary,
 } from "@/db/database";
+import { buildPlayerFinancialCycles, calculatePlayerFinancialSummary } from "@/lib/finance-calculator";
 import { toast } from "@/hooks/use-toast";
 import { printThermalReceipt } from "@/utils/thermalReceiptPrint";
 import PlayerModal from "@/components/PlayerModal";
@@ -147,29 +147,29 @@ const ActiveCashGame = () => {
     const playerTxs = transactions
       .filter(t => playerCashPlayerIds.has(t.cashPlayerId))
       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    const playerFinancialTxs = financialTransactions.filter(tx => tx.playerId === sp.playerId);
+    const cycles = buildPlayerFinancialCycles({
+      sessionId: session.id,
+      playerId: sp.playerId,
+      transactions: playerTxs,
+      financialTransactions: playerFinancialTxs,
+    });
+    const summary = calculatePlayerFinancialSummary(cycles);
     const paymentForTx = (tx: DBTransaction) => {
       if (tx.type === "cashout" || tx.type === "withdrawal") return "";
-      const financialTx = financialTransactions.find(item =>
-        item.playerId === sp.playerId &&
+      const financialTx = playerFinancialTxs.find(item =>
         item.type === tx.type &&
         item.amount === tx.amount &&
         Math.abs(new Date(item.occurredAt).getTime() - new Date(tx.timestamp).getTime()) < 2000
       );
       return financialTx ? paymentLabelMap[financialTx.paymentMethod] ?? financialTx.paymentMethod : "";
     };
-    const playerFinancialTxs = financialTransactions.filter(tx => tx.playerId === sp.playerId);
-    const cycles = buildPlayerFiadoCycles({
-      sessionId: session.id,
-      playerId: sp.playerId,
-      transactions: playerTxs,
-      financialTransactions: playerFinancialTxs,
-    });
-    const receiptTotalInvested = cycles.reduce((sum, cycle) => sum + cycle.totalInvested, 0);
-    const totalFiado = cycles.reduce((sum, cycle) => sum + cycle.totalFiado, 0);
-    const totalCashout = cycles.reduce((sum, cycle) => sum + cycle.totalCashout, 0);
-    const receiptResult = cycles.reduce((sum, cycle) => sum + cycle.result, 0);
-    const customerPays = cycles.reduce((sum, cycle) => sum + cycle.debtAmount, 0);
-    const customerReceives = cycles.reduce((sum, cycle) => sum + cycle.creditAmount, 0);
+    const receiptTotalInvested = summary.totalInvested;
+    const totalFiado = summary.totalFiado;
+    const totalCashout = summary.totalCashout;
+    const receiptResult = summary.result;
+    const customerPays = summary.clientPays;
+    const customerReceives = summary.clientReceives;
     const cycleSections = cycles.map(cycle => {
       const txRows = cycle.transactions
         .filter(tx => tx.type !== "addon")
@@ -503,7 +503,34 @@ const ActiveCashGame = () => {
   const closeBuyins = closeTxs.filter(tx => tx.type === "buyin").reduce((sum, tx) => sum + tx.amount, 0);
   const closeRebuys = closeTxs.filter(tx => tx.type === "rebuy").reduce((sum, tx) => sum + tx.amount, 0);
   const closeAddons = closeTxs.filter(tx => tx.type === "addon").reduce((sum, tx) => sum + tx.amount, 0);
-  const closeResult = closeTarget ? closeCashout - closeTarget.totalInvested : 0;
+  const closeSummary = useMemo(() => {
+    if (!closeTarget) {
+      return {
+        totalInvested: 0,
+        totalFiado: 0,
+        totalCashout: 0,
+        result: 0,
+        clientPays: 0,
+        clientReceives: 0,
+      };
+    }
+    const playerCashPlayerIds = new Set(
+      cashPlayers.filter(cp => cp.playerId === closeTarget.playerId).map(cp => cp.id)
+    );
+    playerCashPlayerIds.add(closeTarget.id);
+    const playerTxs = transactions
+      .filter(tx => playerCashPlayerIds.has(tx.cashPlayerId))
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    const playerFinancialTxs = financialTransactions.filter(tx => tx.playerId === closeTarget.playerId);
+    const cycles = buildPlayerFinancialCycles({
+      sessionId: closeTarget.sessionId,
+      playerId: closeTarget.playerId,
+      transactions: playerTxs,
+      financialTransactions: playerFinancialTxs,
+    });
+    return calculatePlayerFinancialSummary(cycles);
+  }, [closeTarget, cashPlayers, transactions, financialTransactions]);
+  const closeResult = closeTarget ? closeCashout - closeSummary.totalInvested : 0;
 
   const handleEndSession = async () => {
     if (activePlayers.length > 0) {
@@ -979,7 +1006,7 @@ const ActiveCashGame = () => {
               const cp = cashPlayers.find(c => c.id === closeTargetId);
               return cp ? (
                 <div className="text-sm text-muted-foreground">
-                  <p>Total investido: <span className="text-foreground font-bold">R$ {cp.totalInvested.toFixed(2)}</span></p>
+                  <p>Total investido: <span className="text-foreground font-bold">R$ {closeSummary.totalInvested.toFixed(2)}</span></p>
                   <p>Fichas atuais: <span className="text-foreground font-bold">R$ {cp.currentChips.toFixed(2)}</span></p>
                 </div>
               ) : null;
@@ -1010,6 +1037,7 @@ const ActiveCashGame = () => {
               <div className="flex justify-between"><span className="text-muted-foreground">Buy-ins</span><span>R$ {closeBuyins.toFixed(2)}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Rebuys</span><span>R$ {closeRebuys.toFixed(2)}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Add-ons</span><span>R$ {closeAddons.toFixed(2)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Total investido</span><strong>R$ {closeSummary.totalInvested.toFixed(2)}</strong></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Cash-out</span><strong>R$ {closeCashout.toFixed(2)}</strong></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Resultado</span><strong>R$ {closeResult >= 0 ? "+" : ""}{closeResult.toFixed(2)}</strong></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Pagamento</span><span>{paymentLabelMap[closeTarget.paymentMethod] ?? closeTarget.paymentMethod}</span></div>
