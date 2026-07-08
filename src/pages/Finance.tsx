@@ -14,6 +14,7 @@ import {
   calculateSessionFiadoBalances,
   getSessionFinanceSummary,
   payReceivable,
+  recordFinancialEntry,
   reconcileSessionFiadoBalances,
   type DBCashSession,
   type DBFinancialTransaction,
@@ -41,6 +42,10 @@ type ReceivableGroup = {
 type MonthlySummary = SessionFinanceSummary & {
   fiadoGenerated: number;
   sessionsCount: number;
+};
+
+type ClientCreditTarget = PlayerFiadoBalance & {
+  player?: DBPlayer;
 };
 
 const money = (value: number) => `R$ ${value.toFixed(2)}`;
@@ -115,6 +120,8 @@ const Finance = () => {
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<ReceivablePaymentMethod>("cash");
   const [paymentNotes, setPaymentNotes] = useState("");
+  const [creditPaymentOpen, setCreditPaymentOpen] = useState(false);
+  const [creditTarget, setCreditTarget] = useState<ClientCreditTarget | null>(null);
 
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<DBSessionExpense | null>(null);
@@ -300,6 +307,32 @@ const Finance = () => {
     setPaymentOpen(true);
   };
 
+  const openCreditPayment = (balance: PlayerFiadoBalance) => {
+    setCreditTarget({ ...balance, player: playerMap.get(balance.playerId) });
+    setCreditPaymentOpen(true);
+  };
+
+  const payClientCredit = async () => {
+    if (!creditTarget || creditTarget.creditAmount <= 0) return;
+    try {
+      await recordFinancialEntry({
+        sessionId: creditTarget.sessionId,
+        playerId: creditTarget.playerId,
+        amount: creditTarget.creditAmount,
+        paymentMethod: "cash",
+        type: "settlement",
+        notes: "Pagamento de crédito do cliente",
+      });
+      toast({ title: "Crédito pago", description: `${creditTarget.player?.name ?? "Cliente"} atualizado.` });
+      setCreditPaymentOpen(false);
+      setCreditTarget(null);
+      await load();
+    } catch (error) {
+      console.error("Erro ao pagar crédito:", error);
+      toast({ title: "Erro", description: "Falha ao registrar pagamento ao cliente.", variant: "destructive" });
+    }
+  };
+
   const registerPayment = async () => {
     if (!paymentGroup) return;
     let remaining = Number(paymentAmount);
@@ -377,7 +410,7 @@ const Finance = () => {
     { label: "Débito", value: summary.debit, icon: CreditCard },
     { label: "Fiado", value: summary.fiado, icon: Receipt },
     { label: "Total a receber", value: summary.totalReceivable, icon: Receipt },
-    { label: "Clientes a pagar", value: fiadoCredits.reduce((sum, item) => sum + item.creditAmount, 0), icon: Receipt },
+    { label: "Créditos de clientes", value: fiadoCredits.reduce((sum, item) => sum + item.creditAmount, 0), icon: Receipt },
     { label: "Despesas", value: summary.expenses, icon: Receipt },
     { label: "Rake bruto", value: summary.rakeGross, icon: DollarSign },
     { label: "Comissão dealer", value: summary.dealerPayment, icon: DollarSign },
@@ -472,7 +505,7 @@ const Finance = () => {
         <TabsContent value="receivables" className="space-y-3">
           <Card className="bg-card border-border">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Clientes para receber</CardTitle>
+              <CardTitle className="text-base">A receber em aberto</CardTitle>
             </CardHeader>
             <CardContent className="p-0 overflow-x-auto">
               <table className="w-full text-sm">
@@ -493,7 +526,7 @@ const Finance = () => {
                       <td className="p-3">{group.lastDebit ? dateTime(group.lastDebit.createdAt) : "-"}</td>
                       <td className="p-3">{group.originSession?.name ?? "-"}</td>
                       <td className="p-3 text-right">
-                        <Button size="sm" onClick={() => openPayment(group)}>Registrar pagamento</Button>
+                        <Button size="sm" onClick={() => openPayment(group)}>Receber</Button>
                       </td>
                     </tr>
                   ))}
@@ -506,7 +539,7 @@ const Finance = () => {
           </Card>
           <Card className="bg-card border-border">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Clientes a pagar</CardTitle>
+              <CardTitle className="text-base">Créditos de clientes</CardTitle>
             </CardHeader>
             <CardContent className="p-0 overflow-x-auto">
               <table className="w-full text-sm">
@@ -516,6 +549,7 @@ const Finance = () => {
                     <th className="p-3 text-right">Crédito</th>
                     <th className="p-3 text-right">Total fiado</th>
                     <th className="p-3 text-right">Total cash-out</th>
+                    <th className="p-3 text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -525,10 +559,13 @@ const Finance = () => {
                       <td className="p-3 text-right font-bold">{money(balance.creditAmount)}</td>
                       <td className="p-3 text-right">{money(balance.totalFiado)}</td>
                       <td className="p-3 text-right">{money(balance.totalCashout)}</td>
+                      <td className="p-3 text-right">
+                        <Button size="sm" onClick={() => openCreditPayment(balance)}>Pagar</Button>
+                      </td>
                     </tr>
                   ))}
                   {fiadoCredits.length === 0 && (
-                    <tr><td colSpan={4} className="p-6 text-center text-muted-foreground">Nenhum cliente com crédito a receber do caixa.</td></tr>
+                    <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">Nenhum crédito de cliente em aberto.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -604,7 +641,7 @@ const Finance = () => {
 
       <Dialog open={paymentOpen} onOpenChange={setPaymentOpen}>
         <DialogContent className="bg-card border-border max-w-md">
-          <DialogHeader><DialogTitle className="text-poker-gold">Registrar pagamento</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="text-poker-gold">Confirmar recebimento</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
               {paymentGroup?.player?.name ?? "Cliente"} - saldo {money(paymentGroup?.totalOpen ?? 0)}
@@ -632,7 +669,30 @@ const Finance = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPaymentOpen(false)}>Cancelar</Button>
-            <Button onClick={registerPayment}>Registrar</Button>
+            <Button onClick={registerPayment}>Receber</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={creditPaymentOpen} onOpenChange={setCreditPaymentOpen}>
+        <DialogContent className="bg-card border-border max-w-md">
+          <DialogHeader><DialogTitle className="text-poker-gold">Confirmar pagamento ao cliente</DialogTitle></DialogHeader>
+          <div className="space-y-3 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Cliente</span>
+              <strong>{creditTarget?.player?.name ?? "Cliente"}</strong>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Crédito em aberto</span>
+              <strong>{money(creditTarget?.creditAmount ?? 0)}</strong>
+            </div>
+            <p className="text-muted-foreground">
+              Ao confirmar, o crédito será marcado como pago por um lançamento financeiro permanente de acerto.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreditPaymentOpen(false)}>Cancelar</Button>
+            <Button onClick={payClientCredit}>Pagar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -764,12 +764,8 @@ export async function getSessionFinanceSummary(session: DBCashSession): Promise<
 }
 
 export async function deleteSessionFinancialData(sessionId: string): Promise<void> {
-  const [financialTransactions, receivables, expenses] = await Promise.all([
-    db.financialTransactions.where("sessionId").equals(sessionId).toArray(),
-    db.receivables.where("sessionId").equals(sessionId).toArray(),
-    db.sessionExpenses.where("sessionId").equals(sessionId).toArray(),
-  ]);
-  await db.financialTransactions.bulkDelete(financialTransactions.map(item => item.id));
-  await db.receivables.bulkDelete(receivables.map(item => item.id));
-  await db.sessionExpenses.bulkDelete(expenses.map(item => item.id));
+  console.warn(
+    "[finance] deleteSessionFinancialData ignorado para preservar financeiro permanente.",
+    { sessionId },
+  );
 }

@@ -10,6 +10,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { db, type DBCashSession, type DBCashPlayer, type DBTransaction } from "@/db/database";
 import Seo from "@/components/Seo";
+import { getHiddenRecentTransactionIds, getHiddenSessionIds, hideRecentTransactionIds } from "@/utils/visualHistory";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -25,7 +26,8 @@ const Index = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const allSessions = await db.cashSessions.toArray();
+        const hiddenSessionIds = getHiddenSessionIds();
+        const allSessions = (await db.cashSessions.toArray()).filter(session => !hiddenSessionIds.has(session.id));
         setSessions(allSessions);
 
         const active = allSessions.filter(s => s.status === "active");
@@ -42,7 +44,11 @@ const Index = () => {
         const allTxs = await db.transactions.toArray();
         const allCashPlayers = await db.cashPlayers.toArray();
         
-        const sorted = allTxs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 10);
+        const hiddenRecentTransactionIds = getHiddenRecentTransactionIds();
+        const sorted = allTxs
+          .filter(tx => !hiddenRecentTransactionIds.has(tx.id))
+          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+          .slice(0, 10);
         
         const enriched = sorted.map(tx => {
           const cp = allCashPlayers.find(c => c.id === tx.cashPlayerId);
@@ -241,15 +247,15 @@ const Index = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir atividade?</AlertDialogTitle>
-            <AlertDialogDescription>Essa ação não pode ser desfeita.</AlertDialogDescription>
+            <AlertDialogDescription>Essa ação só remove o item da atividade recente. O Financeiro permanece intacto.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={async () => {
               try {
-                await db.transactions.delete(deleteTarget!);
+                hideRecentTransactionIds([deleteTarget!]);
                 setRecentActivity(prev => prev.filter(t => t.id!.toString() !== deleteTarget));
-                toast({ title: "Removido ✅" });
+                toast({ title: "Atividade ocultada" });
               } catch (e) { console.error(e); toast({ title: "Erro", variant: "destructive" }); }
               setDeleteTarget(null);
             }}>Excluir</AlertDialogAction>
@@ -262,15 +268,15 @@ const Index = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Limpar toda atividade?</AlertDialogTitle>
-            <AlertDialogDescription>Todas as transações do histórico recente serão removidas permanentemente.</AlertDialogDescription>
+            <AlertDialogDescription>As atividades recentes serão limpas apenas do Dashboard. O Financeiro permanece intacto.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={async () => {
               try {
-                await db.transactions.clear();
+                hideRecentTransactionIds(recentActivity.map(tx => tx.id));
                 setRecentActivity([]);
-                toast({ title: "Histórico limpo! 🗑️" });
+                toast({ title: "Atividades recentes limpas" });
               } catch (e) { console.error(e); toast({ title: "Erro", variant: "destructive" }); }
               setClearAllOpen(false);
             }}>Limpar Tudo</AlertDialogAction>

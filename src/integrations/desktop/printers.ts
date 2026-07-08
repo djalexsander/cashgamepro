@@ -76,7 +76,7 @@ export const printReceiptText = async (
 ) => {
   const invoke = await getInvoke();
   if (!invoke) {
-    throw new Error("ImpressÃ£o direta sÃ³ estÃ¡ disponÃ­vel no app desktop.");
+    throw new Error("Impressão direta só está disponível no app desktop.");
   }
 
   return invoke<string>("print_receipt_text", {

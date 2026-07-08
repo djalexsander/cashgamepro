@@ -3,12 +3,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { Plus, Spade, Play, Clock, Trash2 } from "lucide-react";
-import { db, deleteSessionFinancialData, type DBCashSession } from "@/db/database";
+import { db, type DBCashSession } from "@/db/database";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { getHiddenSessionIds, hideSessionIds } from "@/utils/visualHistory";
 
 const CashGames = () => {
   const navigate = useNavigate();
@@ -18,7 +19,10 @@ const CashGames = () => {
 
   useEffect(() => {
     db.cashSessions.orderBy("startedAt").reverse().toArray()
-      .then(data => setSessions(data ?? []))
+      .then(data => {
+        const hiddenSessionIds = getHiddenSessionIds();
+        setSessions((data ?? []).filter(session => !hiddenSessionIds.has(session.id)));
+      })
       .catch(err => {
         console.error("Erro ao carregar sessões:", err);
         setSessions([]);
@@ -99,22 +103,16 @@ const CashGames = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir sessão encerrada?</AlertDialogTitle>
-            <AlertDialogDescription>Todos os dados de jogadores e transações destá sessão serão removidos permanentemente.</AlertDialogDescription>
+            <AlertDialogDescription>A sessão será removida apenas da lista visual. O Financeiro permanece intacto.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={async () => {
               try {
                 const sid = deleteTarget!;
-                const cps = await db.cashPlayers.where("sessionId").equals(sid).toArray();
-                const cpIds = cps.map(c => c.id!);
-                const txs = await db.transactions.where("sessionId").equals(sid).toArray();
-                for (const tx of txs) await db.transactions.delete(tx.id);
-                await deleteSessionFinancialData(sid);
-                if (cpIds.length) await db.cashPlayers.bulkDelete(cpIds);
-                await db.cashSessions.delete(sid);
+                hideSessionIds([sid]);
                 setSessions(prev => prev.filter(s => s.id !== sid));
-                toast({ title: "Sessão excluída ✅" });
+                toast({ title: "Sessão ocultada da lista" });
               } catch (e) { console.error(e); toast({ title: "Erro ao excluir", variant: "destructive" }); }
               setDeleteTarget(null);
             }}>Excluir</AlertDialogAction>

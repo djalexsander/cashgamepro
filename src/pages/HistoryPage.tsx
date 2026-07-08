@@ -13,12 +13,13 @@ import {
   History, DollarSign, Users, Clock, ChevronRight, Filter, CalendarIcon, X,
   TrendingUp, TrendingDown, ArrowUpCircle, ArrowDownCircle, RotateCcw, LogIn, LogOut, Trash2
 } from "lucide-react";
-import { db, deleteSessionFinancialData, type DBCashSession, type DBCashPlayer, type DBPlayer, type DBTransaction, type DBFinancialTransaction } from "@/db/database";
+import { db, type DBCashSession, type DBCashPlayer, type DBPlayer, type DBTransaction, type DBFinancialTransaction } from "@/db/database";
 import { buildPlayerFinancialCycles, calculatePlayerFinancialSummary } from "@/lib/finance-calculator";
 import Seo from "@/components/Seo";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { getHiddenSessionIds, hideSessionIds } from "@/utils/visualHistory";
 
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
 const formatTime = (iso: string) => new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -66,7 +67,8 @@ const HistoryPage = () => {
     const loadHistory = async () => {
       try {
         const all = await db.cashSessions.toArray();
-        const closed = all.filter(s => s.status === "closed");
+        const hiddenSessionIds = getHiddenSessionIds();
+        const closed = all.filter(s => s.status === "closed" && !hiddenSessionIds.has(s.id));
         closed.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
         setSessions(closed);
         setFilteredSessions(closed);
@@ -135,14 +137,10 @@ const HistoryPage = () => {
 
   const deleteSession = async (sid: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    const cps = await db.cashPlayers.where("sessionId").equals(sid).toArray();
-    await db.cashPlayers.bulkDelete(cps.map(c => c.id));
-    const txs = await db.transactions.where("sessionId").equals(sid).toArray();
-    await db.transactions.bulkDelete(txs.map(t => t.id));
-    await deleteSessionFinancialData(sid);
-    await db.cashSessions.delete(sid);
+    hideSessionIds([sid]);
     setSessions(prev => prev.filter(s => s.id !== sid));
-    toast({ title: "Sessão excluída! 🗑️" });
+    setFilteredSessions(prev => prev.filter(s => s.id !== sid));
+    toast({ title: "Sessão ocultada do histórico" });
   };
 
   const uniqueGameTypes = [...new Set(sessions.map(s => s.gameType))];
@@ -178,16 +176,10 @@ const HistoryPage = () => {
               className="text-xs"
               onClick={async () => {
                 const closedIds = sessions.map(s => s.id);
-                for (const sid of closedIds) {
-                  const cps = await db.cashPlayers.where("sessionId").equals(sid).toArray();
-                  await db.cashPlayers.bulkDelete(cps.map(c => c.id));
-                  const txs = await db.transactions.where("sessionId").equals(sid).toArray();
-                  await db.transactions.bulkDelete(txs.map(t => t.id));
-                  await deleteSessionFinancialData(sid);
-                }
-                await db.cashSessions.bulkDelete(closedIds);
+                hideSessionIds(closedIds);
                 setSessions([]);
-                toast({ title: "Histórico limpo! 🗑️" });
+                setFilteredSessions([]);
+                toast({ title: "Histórico visual limpo" });
               }}
             >
               <Trash2 className="w-3 h-3 mr-1" /> Limpar
