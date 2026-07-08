@@ -1,32 +1,5 @@
--- Financial area for Cash Game Pro.
---
--- This migration is intentionally aligned with the table names hardcoded in
--- src/db/database.ts. The frontend uses:
---   sessions:           public.cash_sessions
---   players:            public.players
---   session players:    public.cash_players
---   legacy transactions public.transactions
---   finance entries:    public.financial_transactions
---   receivables:        public.receivables
---   expenses:           public.session_expenses
---
--- If public.cash_sessions does not exist, the production database is missing
--- the base Cash Game Pro schema expected by the app. In that case this
--- migration stops with a clear message instead of creating an incompatible
--- parallel schema.
-
-DO $$
-BEGIN
-  IF to_regclass('public.cash_sessions') IS NULL THEN
-    RAISE EXCEPTION
-      'Cash Game Pro schema mismatch: public.cash_sessions does not exist, but the frontend uses db.cashSessions -> public.cash_sessions. Apply the base schema migration before the financial migration or update the frontend table mapping.';
-  END IF;
-
-  IF to_regclass('public.players') IS NULL THEN
-    RAISE EXCEPTION
-      'Cash Game Pro schema mismatch: public.players does not exist, but the frontend uses db.players -> public.players.';
-  END IF;
-END $$;
+-- Cash Game Pro financial schema.
+-- Aligned with src/db/database.ts and src/pages/Finance.tsx.
 
 ALTER TABLE public.cash_sessions
   ADD COLUMN IF NOT EXISTS dealer_percentage numeric NOT NULL DEFAULT 0;
@@ -192,86 +165,6 @@ BEGIN
     ALTER TABLE public.session_expenses
       ADD CONSTRAINT session_expenses_category_check
       CHECK (category IN ('dealer', 'food', 'drinks', 'staff', 'cleaning', 'rent', 'other')) NOT VALID;
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conrelid = 'public.financial_transactions'::regclass
-      AND conname = 'financial_transactions_user_id_fkey'
-  ) THEN
-    ALTER TABLE public.financial_transactions
-      ADD CONSTRAINT financial_transactions_user_id_fkey
-      FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE NOT VALID;
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conrelid = 'public.financial_transactions'::regclass
-      AND conname = 'financial_transactions_session_id_fkey'
-  ) THEN
-    ALTER TABLE public.financial_transactions
-      ADD CONSTRAINT financial_transactions_session_id_fkey
-      FOREIGN KEY (session_id) REFERENCES public.cash_sessions(id) ON DELETE CASCADE NOT VALID;
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conrelid = 'public.financial_transactions'::regclass
-      AND conname = 'financial_transactions_player_id_fkey'
-  ) THEN
-    ALTER TABLE public.financial_transactions
-      ADD CONSTRAINT financial_transactions_player_id_fkey
-      FOREIGN KEY (player_id) REFERENCES public.players(id) ON DELETE SET NULL NOT VALID;
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conrelid = 'public.receivables'::regclass
-      AND conname = 'receivables_user_id_fkey'
-  ) THEN
-    ALTER TABLE public.receivables
-      ADD CONSTRAINT receivables_user_id_fkey
-      FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE NOT VALID;
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conrelid = 'public.receivables'::regclass
-      AND conname = 'receivables_session_id_fkey'
-  ) THEN
-    ALTER TABLE public.receivables
-      ADD CONSTRAINT receivables_session_id_fkey
-      FOREIGN KEY (session_id) REFERENCES public.cash_sessions(id) ON DELETE CASCADE NOT VALID;
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conrelid = 'public.receivables'::regclass
-      AND conname = 'receivables_player_id_fkey'
-  ) THEN
-    ALTER TABLE public.receivables
-      ADD CONSTRAINT receivables_player_id_fkey
-      FOREIGN KEY (player_id) REFERENCES public.players(id) ON DELETE CASCADE NOT VALID;
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conrelid = 'public.session_expenses'::regclass
-      AND conname = 'session_expenses_user_id_fkey'
-  ) THEN
-    ALTER TABLE public.session_expenses
-      ADD CONSTRAINT session_expenses_user_id_fkey
-      FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE NOT VALID;
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conrelid = 'public.session_expenses'::regclass
-      AND conname = 'session_expenses_session_id_fkey'
-  ) THEN
-    ALTER TABLE public.session_expenses
-      ADD CONSTRAINT session_expenses_session_id_fkey
-      FOREIGN KEY (session_id) REFERENCES public.cash_sessions(id) ON DELETE CASCADE NOT VALID;
   END IF;
 
   IF NOT EXISTS (
